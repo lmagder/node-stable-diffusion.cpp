@@ -1,0 +1,12 @@
+{
+  "name": "node-stable-diffusion.cpp",
+  "version": "0.1.0",
+  "description": "Node bindings for https://github.com/leejet/stable-diffusion.cpp",
+  "scripts": {
+    "install": "cmake-js compile"
+  },
+  "dependencies": {
+    "cmake-js": "7.3.0",
+    "nan": "2.20.0"
+  }
+}
