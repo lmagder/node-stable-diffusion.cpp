@@ -1,0 +1,1 @@
+# node-stable-diffusion.cpp
