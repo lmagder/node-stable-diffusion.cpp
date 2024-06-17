@@ -1,8 +1,10 @@
-#include <nan.h>
+#include <napi.h>
 
-NAN_MODULE_INIT(InitAll) 
-{
+class NodeStableDiffusionCpp : public Napi::Addon<NodeStableDiffusionCpp> {
+ public:
+  NodeStableDiffusionCpp(Napi::Env env, Napi::Object exports) {
+  }
+ private:
+};
 
-}
-
-NODE_MODULE(NODE_GYP_MODULE_NAME, InitAll)
+NODE_API_ADDON(NodeStableDiffusionCpp)
