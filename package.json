@@ -3,13 +3,18 @@
   "version": "0.1.0",
   "description": "Node bindings for https://github.com/leejet/stable-diffusion.cpp",
   "scripts": {
-    "install": "cmake-js compile"
+    "install": "pkg-prebuilds-verify ./binding-options.js || cmake-js compile",
+    "build": "cmake-js build",
+    "rebuild": "cmake-js rebuild"
   },
   "binary": {
-    "napi_versions": [8]
+    "napi_versions": [
+      8
+    ]
   },
   "dependencies": {
     "cmake-js": "7.3.0",
-    "node-addon-api": "8.0.0"
+    "node-addon-api": "8.0.0",
+    "pkg-prebuilds": "1.0.0"
   }
 }

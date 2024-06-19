@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.21)
 cmake_policy(SET CMP0091 NEW)
 cmake_policy(SET CMP0042 NEW)
 cmake_policy(SET CMP0091 NEW)
@@ -19,6 +19,7 @@ FetchContent_Declare(
 set(SD_CUBLAS ON)
 set(SD_FLASH_ATTN ON)
 set(GGML_CUDA_F16 ON)
+set(GGML_STATIC ON)
 if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
 	set(CMAKE_CUDA_ARCHITECTURES "75;86;89")
 endif()
@@ -26,6 +27,8 @@ endif()
 FetchContent_MakeAvailable(stable-diffusion-cpp)
 
 project(node-stable-diffusion.cpp)
+
+find_package(CUDAToolkit REQUIRED)
 
 file(GLOB SOURCE_FILES "src/*.cpp" "src/*.h")
 add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
@@ -41,4 +44,10 @@ target_link_libraries(${PROJECT_NAME} ${CMAKE_JS_LIB} stable-diffusion)
 if(MSVC AND CMAKE_JS_NODELIB_DEF AND CMAKE_JS_NODELIB_TARGET)
   # Generate node.lib
   execute_process(COMMAND ${CMAKE_AR} /def:${CMAKE_JS_NODELIB_DEF} /out:${CMAKE_JS_NODELIB_TARGET} ${CMAKE_STATIC_LINKER_FLAGS})
+
+  #copy cublas DLLs
+  add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${CUDAToolkit_TARGET_DIR}/bin/cublas64_${CUDAToolkit_VERSION_MAJOR}.dll $<TARGET_FILE_DIR:${PROJECT_NAME}>
+    COMMAND_EXPAND_LISTS
+  )
 endif()

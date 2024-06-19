@@ -1,3 +1,6 @@
+#include <optional>
+#include <type_traits>
+
 #include <napi.h>
 #include <ggml.h>
 #include <stable-diffusion.h>
@@ -41,10 +44,118 @@ namespace
 
     struct CPPContextData
     {
-        std::unique_ptr<sd_ctx_t, decltype(free_sd_ctx)*> sdCtx;
+        std::shared_ptr<sd_ctx_t> sdCtx;
         Napi::TypedThreadSafeFunction<std::nullptr_t, callJsLogArgs, callJsLog> logCallback;
         Napi::TypedThreadSafeFunction<std::nullptr_t, callJsProgressArgs, callJsProgress> progressCallback;
+        std::vector<std::unique_ptr<Napi::AsyncWorker>> pendingTasks;
+
+        CPPContextData() = default;
+        CPPContextData(const CPPContextData& ctx) = delete;
+        CPPContextData(CPPContextData&& ctx) = delete;
+        CPPContextData& operator=(const CPPContextData& ctx) = delete;
+        CPPContextData& operator=(CPPContextData&& ctx) = delete;
+
+        ~CPPContextData()
+        {
+            if (progressCallback)
+                progressCallback.Release();
+
+            if (logCallback)
+                logCallback.Release();
+        }
+
+        void nextTask()
+        {
+            if (!pendingTasks.empty())
+            {
+                auto begin = pendingTasks.begin();
+                begin->release()->Queue();
+                pendingTasks.erase(begin);
+            }
+        }
     };
+
+    class freeSdImageList
+    {
+        size_t imageCount;
+    public:
+        freeSdImageList(size_t imageCount) noexcept : imageCount(imageCount) {};
+
+
+        void operator()(sd_image_t* ptr) const
+        {
+            if (ptr)
+            {
+                for (size_t i = 0; i < imageCount; i++)
+                {
+                    free(ptr[i].data);
+                }
+
+                free(ptr);
+            }
+        }
+
+    };
+
+    class freeSdImage
+    {
+    public:
+        void operator()(sd_image_t* ptr) const
+        {
+            if (ptr)
+            {
+                free(ptr->data);
+                free(ptr);
+            }
+        }
+
+    };
+
+    using SdImageList = std::unique_ptr<sd_image_t[], freeSdImageList>;
+    using SdImage = std::unique_ptr<sd_image_t, freeSdImage>;
+
+    Napi::Object wrapSdImage(Napi::Env env, const sd_image_t& img)
+    {
+        auto imgObj = Napi::Object::New(env);
+        imgObj.DefineProperties({
+                Napi::PropertyDescriptor::Value("width",  Napi::Number::From(env, img.width)),
+                Napi::PropertyDescriptor::Value("height",  Napi::Number::From(env, img.height)),
+                Napi::PropertyDescriptor::Value("channel",  Napi::Number::From(env, img.channel)),
+                Napi::PropertyDescriptor::Value("data",  Napi::Buffer<uint8_t>::Copy(env, img.data, size_t(img.width) * img.height * img.channel))
+            });
+
+        imgObj.Freeze();
+        return imgObj;
+    }
+
+    SdImage extractSdImage(Napi::Object imgObj)
+    {
+        const auto width = imgObj.Get("width").ToNumber().Int32Value();
+        const auto height = imgObj.Get("height").ToNumber().Int32Value();
+        const auto channel = imgObj.Get("channel").ToNumber().Int32Value();
+        Napi::Buffer<uint8_t>::CheckCast(imgObj.Env(), imgObj.Get("data"));
+        const auto data = imgObj.Get("data").As<Napi::Buffer<uint8_t>>();
+
+        if (width <= 0 || height <= 0 || channel <= 0)
+        {
+            throw Napi::Error::New(imgObj.Env(), "Invalid size");
+        }
+
+        const size_t expectedSize = size_t(width) * height * channel;
+        if (expectedSize != data.Length())
+        {
+            throw Napi::Error::New(imgObj.Env(), "Invalid size");
+        }
+
+        auto img = (sd_image_t*)calloc(1, sizeof(sd_image_t));
+        img->width = width;
+        img->height = height;
+        img->channel = channel;
+        img->data = (uint8_t*)malloc(expectedSize);
+        memcpy(img->data, data.Data(), data.Length());
+
+        return SdImage(img);
+    }
 
     constinit thread_local CPPContextData* tl_current = nullptr;
 
@@ -68,6 +179,57 @@ namespace
         }
     }
 
+    template <typename T, typename C>
+    Napi::Promise queueStableDiffusionWorker(Napi::Env env, const std::shared_ptr<CPPContextData>& ctx, T&& func, C&& convFunc)
+    {
+        class StableDiffusionWorker : public Napi::AsyncWorker
+        {
+            //copy this on purpose to snapshot it
+            std::shared_ptr<CPPContextData> ctx;
+            Napi::Promise::Deferred def;
+            std::decay_t<T> func;
+            std::decay_t<C> convFunc;
+            std::optional<std::invoke_result_t<decltype(func), CPPContextData&>> result;
+        public:
+            StableDiffusionWorker(Napi::Env env, const std::shared_ptr<CPPContextData>& ctx, T&& func, C&& convFunc) : Napi::AsyncWorker(env, "node-stable-diffusion-cpp-worker"),
+                ctx(ctx), def(env), func(std::forward<T>(func)), convFunc(std::forward<C>(convFunc))
+            {
+            }
+
+            void Execute() override
+            {
+                auto prev = std::exchange(tl_current, ctx.get());
+                result.emplace(func(*ctx));
+                tl_current = prev;
+            }
+
+            void OnOK() override
+            {
+                def.Resolve(convFunc(Env(), std::move(result).value()));
+                ctx->nextTask();
+            }
+
+            void OnError(const Napi::Error& e) override
+            {
+                def.Reject(e.Value());
+                ctx->nextTask();
+            }
+
+            Napi::Promise Promise() const { return def.Promise(); }
+
+        };
+
+        const bool isFirst = ctx->pendingTasks.empty();
+        auto worker = std::make_unique<StableDiffusionWorker>(env, ctx, std::forward<T>(func), std::forward<C>(convFunc));
+        const auto ret = worker->Promise();
+        ctx->pendingTasks.emplace_back(std::move(worker));
+
+        if (isFirst)
+            ctx->nextTask();
+
+        return ret;
+    }
+   
     class NodeStableDiffusionCpp : public Napi::Addon<NodeStableDiffusionCpp>
     {
     public:
@@ -114,29 +276,80 @@ namespace
                 throw Napi::Error::New(info.Env(), "Invalid schedule");
 
 
-            auto sdCtx = new_sd_ctx(model.c_str(), vae.c_str(), taesd.c_str(), controlNet.c_str(), loraDir.c_str(),
+            std::shared_ptr<sd_ctx_t> sdCtx = { new_sd_ctx(model.c_str(), vae.c_str(), taesd.c_str(), controlNet.c_str(), loraDir.c_str(),
                 embedDir.c_str(), stackedIdEmbedDir.c_str(), vaeDecodeOnly, vaeTiling, freeParamsImmediately, numThreads, weightType,
-                cudaRng ? CUDA_RNG : STD_DEFAULT_RNG, schedule, keepClipOnCpu, keepControlNetOnCpu, keepVaeOnCpu);
+                cudaRng ? CUDA_RNG : STD_DEFAULT_RNG, schedule, keepClipOnCpu, keepControlNetOnCpu, keepVaeOnCpu), &free_sd_ctx };
 
             if (!sdCtx)
                 throw Napi::Error::New(info.Env(), "Context creation failed");
 
             auto ctx = Napi::Object::New(info.Env());
-            auto cppContextData = std::make_shared<CPPContextData>(CPPContextData{
-                .sdCtx = { sdCtx, &free_sd_ctx}
-            });
+            auto cppContextData = std::make_shared<CPPContextData>();
+            cppContextData->sdCtx = sdCtx;
 
             ctx.DefineProperties({
-                    Napi::PropertyDescriptor::Function("dispose", [cppContextData](const Napi::CallbackInfo& info) { cppContextData->sdCtx.reset(); }),
+                    Napi::PropertyDescriptor::Function("dispose", [cppContextData](const Napi::CallbackInfo& info) 
+                    { 
+                        if (!cppContextData->sdCtx)
+                            throw Napi::Error::New(info.Env(), "Context disposed");
+
+                        cppContextData->sdCtx.reset(); 
+                    }),
                     Napi::PropertyDescriptor::Function("setLogCallback", [cppContextData](const Napi::CallbackInfo& info) 
                     {
+                        if (!cppContextData->sdCtx) 
+                            throw Napi::Error::New(info.Env(), "Context disposed");
+
                         Napi::Function::CheckCast(info.Env(), info[0]);
                         cppContextData->logCallback = decltype(CPPContextData::logCallback)::New(info.Env(), info[0].As<Napi::Function>(), "node-stable-diffusion-cpp-log-callback", 4, 1);
                     }),
                     Napi::PropertyDescriptor::Function("setProgressCallback", [cppContextData](const Napi::CallbackInfo& info) 
                     {
+                        if (!cppContextData->sdCtx) 
+                            throw Napi::Error::New(info.Env(), "Context disposed");
+
                         Napi::Function::CheckCast(info.Env(), info[0]);
                         cppContextData->progressCallback = decltype(CPPContextData::progressCallback)::New(info.Env(), info[0].As<Napi::Function>(), "node-stable-diffusion-cpp-progress-callback", 4, 1);
+                    }),
+                    Napi::PropertyDescriptor::Function("txt2img", [cppContextData](const Napi::CallbackInfo& info)
+                    {
+                        if (!cppContextData->sdCtx)
+                           throw Napi::Error::New(info.Env(), "Context disposed");
+
+
+                        Napi::Value tmp;
+                        const auto params = info[0].ToObject();
+                        const auto prompt = params.Get("prompt").ToString().Utf8Value();
+                        const auto negativePrompt = (tmp = params.Get("negativePrompt"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value());
+                        const auto clipSkip = (tmp = params.Get("clipSkip"), tmp.IsUndefined() ? -1 : tmp.ToNumber().Int32Value());
+                        const auto cfgScale = (tmp = params.Get("cfgScale"), tmp.IsUndefined() ? 7.0f : tmp.ToNumber().FloatValue());
+                        const auto width = (tmp = params.Get("width"), tmp.IsUndefined() ? 512 : tmp.ToNumber().Int32Value());
+                        const auto height = (tmp = params.Get("height"), tmp.IsUndefined() ? 512 : tmp.ToNumber().Int32Value());
+                        const auto sampleMethod = (tmp = params.Get("sampleMethod"), tmp.IsUndefined() ? EULER_A : sample_method_t(tmp.ToNumber().Uint32Value()));
+                        const auto sampleSteps = (tmp = params.Get("sampleSteps"), tmp.IsUndefined() ? 20 : tmp.ToNumber().Int32Value());
+                        const auto seed = (tmp = params.Get("seed"), tmp.IsUndefined() ? 42 : tmp.ToNumber().Int64Value());
+                        const auto batchCount = (tmp = params.Get("batchCount"), tmp.IsUndefined() ? 1 : tmp.ToNumber().Int32Value());
+                        auto controlCond = (tmp = params.Get("controlCond"), tmp.IsUndefined() ? SdImage() : extractSdImage(tmp.ToObject()));
+                        const auto controlStrength = (tmp = params.Get("controlStrength"), tmp.IsUndefined() ? 0.0f : tmp.ToNumber().FloatValue());
+                        const auto styleRatio = (tmp = params.Get("styleRatio"), tmp.IsUndefined() ? 0.0f : tmp.ToNumber().FloatValue());
+                        const auto normalizeInput = (tmp = params.Get("normalizeInput"), tmp.IsUndefined() ? false : tmp.ToBoolean().Value());
+                        const auto inputIdImagesPath = (tmp = params.Get("inputIdImagesPath"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value());
+                        if (sampleMethod >= N_SAMPLE_METHODS)
+                            throw Napi::Error::New(info.Env(), "Invalid sampleMethod");
+
+                        return queueStableDiffusionWorker(info.Env(), cppContextData, [=, controlCond = std::move(controlCond)](CPPContextData& ctx)
+                        {
+                            return SdImageList(txt2img(ctx.sdCtx.get(), prompt.c_str(), negativePrompt.c_str(), clipSkip, cfgScale, width, height, sampleMethod, sampleSteps, seed, batchCount, controlCond.get(), controlStrength, styleRatio, normalizeInput, inputIdImagesPath.c_str()), batchCount);
+                        },
+                        [batchCount](Napi::Env env, SdImageList&& images) 
+                        {
+                            auto arr = Napi::Array::New(env, batchCount);
+                            for (int b = 0; b < batchCount; b++)
+                            {
+                                arr[b] = wrapSdImage(env, images[b]);
+                            }
+                            return arr;
+                        });
                     }),
                 });
 
