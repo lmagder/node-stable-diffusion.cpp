@@ -1,7 +1,7 @@
 import { parseArgs } from "node:util";
 import * as fs from "node:fs";
 import {PNG} from "pngjs";
-import * as sd from "node-stable-diffusion.cpp";
+import sd from "node-stable-diffusion.cpp";
 
 
 const main = async () => {

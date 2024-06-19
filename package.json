@@ -21,6 +21,9 @@
   "exports": {
     ".": "./index.cjs"
   },
+  "files": [
+    "./dist"
+  ],
   "dependencies": {
     "cmake-js": "7.3.0",
     "node-addon-api": "8.0.0",
