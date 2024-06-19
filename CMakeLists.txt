@@ -37,7 +37,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 20)
 
 target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE ${CMAKE_JS_INC})
-target_compile_definitions(${PROJECT_NAME} PRIVATE NAPI_VERSION=8)
+target_compile_definitions(${PROJECT_NAME} PRIVATE NAPI_VERSION=9)
 
 target_link_libraries(${PROJECT_NAME} ${CMAKE_JS_LIB} stable-diffusion)
 
