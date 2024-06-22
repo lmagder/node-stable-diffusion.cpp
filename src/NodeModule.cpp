@@ -11,21 +11,25 @@ namespace
     struct callJsLogArgs
     {
         sd_log_level_t level = SD_LOG_DEBUG;
-        const char* text = nullptr;
+        std::string text;
     };
 
     void callJsLog(Napi::Env env, Napi::Function callback, std::nullptr_t*, callJsLogArgs* data)
     {
+        auto dataPtr = std::unique_ptr<callJsLogArgs>(data);
         Napi::HandleScope hs(env);
         Napi::String logLevel;
-        switch (data->level)
+        switch (dataPtr->level)
         {
             case SD_LOG_ERROR: logLevel = Napi::String::From(env, "error"); break;
             case SD_LOG_WARN: logLevel = Napi::String::From(env, "warn"); break;
             case SD_LOG_INFO: logLevel = Napi::String::From(env, "info"); break;
-            case SD_LOG_DEBUG: logLevel = Napi::String::From(env, "debug"); break;
+            case SD_LOG_DEBUG:
+            default: logLevel = Napi::String::From(env, "debug"); break;
         }
-        callback.Call({ logLevel, Napi::String::From(env, data->text) });
+        dataPtr->text.erase(dataPtr->text.find_last_not_of("\n\r") + 1);
+        auto text = Napi::String::From(env, dataPtr->text);
+        callback.Call({ logLevel, text });
     }
 
     struct callJsProgressArgs
@@ -37,12 +41,14 @@ namespace
 
     void callJsProgress(Napi::Env env, Napi::Function callback, std::nullptr_t*, callJsProgressArgs* data)
     {
+        auto dataPtr = std::unique_ptr<callJsProgressArgs>(data);
         Napi::HandleScope hs(env);
-        callback.Call({ Napi::Number::From(env, data->step), Napi::Number::From(env, data->steps) , Napi::Number::From(env, data->time) });
+        callback.Call({ Napi::Number::From(env, dataPtr->step), Napi::Number::From(env, dataPtr->steps) , Napi::Number::From(env, dataPtr->time) });
     }
 
+    void stableDiffusionLogFunc(enum sd_log_level_t level, const char* text, void* data);
 
-    struct CPPContextData
+    struct CPPContextData : public std::enable_shared_from_this<CPPContextData>
     {
         std::shared_ptr<sd_ctx_t> sdCtx;
         Napi::TypedThreadSafeFunction<std::nullptr_t, callJsLogArgs, callJsLog> logCallback;
@@ -57,11 +63,16 @@ namespace
 
         ~CPPContextData()
         {
+            sdCtx.reset();
+
             if (progressCallback)
                 progressCallback.Release();
 
             if (logCallback)
+            {
+                stableDiffusionLogFunc(SD_LOG_DEBUG, "Closing node context", nullptr);
                 logCallback.Release();
+            }
         }
 
         void nextTask()
@@ -74,6 +85,27 @@ namespace
             }
         }
     };
+
+    constinit thread_local CPPContextData* tl_current = nullptr;
+
+    void stableDiffusionLogFunc(enum sd_log_level_t level, const char* text, void* data)
+    {
+        const auto ctx = tl_current;
+        if (ctx && ctx->logCallback)
+        {
+            ctx->logCallback.BlockingCall(new callJsLogArgs{ .level = level, .text = text });
+        }
+    }
+
+    void stableDiffusionProgressFunc(int step, int steps, float time, void* data)
+    {
+        const auto ctx = tl_current;
+        if (ctx && ctx->progressCallback)
+        {
+            ctx->progressCallback.BlockingCall(new callJsProgressArgs{ .step = step, .steps = steps, .time = time });
+        }
+    }
+
 
     class freeSdImageList
     {
@@ -157,27 +189,6 @@ namespace
         return SdImage(img);
     }
 
-    constinit thread_local CPPContextData* tl_current = nullptr;
-
-    void stableDiffusionLogFunc(enum sd_log_level_t level, const char* text, void* data)
-    {
-        const auto ctx = tl_current;
-        if (ctx && ctx->logCallback)
-        {
-            callJsLogArgs args = { .level = level, .text = text };
-            ctx->logCallback.BlockingCall(&args);
-        }
-    }
-
-    void stableDiffusionProgressFunc(int step, int steps, float time, void* data)
-    {
-        const auto ctx = tl_current;
-        if (ctx && ctx->progressCallback)
-        {
-            callJsProgressArgs args = { .step = step, .steps = steps, .time = time };
-            ctx->progressCallback.BlockingCall(&args);
-        }
-    }
 
     template <typename T, typename C>
     Napi::Promise queueStableDiffusionWorker(Napi::Env env, const std::shared_ptr<CPPContextData>& ctx, T&& func, C&& convFunc)
@@ -275,47 +286,45 @@ namespace
             if (schedule >= N_SCHEDULES)
                 throw Napi::Error::New(info.Env(), "Invalid schedule");
 
-
-            std::shared_ptr<sd_ctx_t> sdCtx = { new_sd_ctx(model.c_str(), vae.c_str(), taesd.c_str(), controlNet.c_str(), loraDir.c_str(),
-                embedDir.c_str(), stackedIdEmbedDir.c_str(), vaeDecodeOnly, vaeTiling, freeParamsImmediately, numThreads, weightType,
-                cudaRng ? CUDA_RNG : STD_DEFAULT_RNG, schedule, keepClipOnCpu, keepControlNetOnCpu, keepVaeOnCpu), &free_sd_ctx };
-
-            if (!sdCtx)
-                throw Napi::Error::New(info.Env(), "Context creation failed");
-
-            auto ctx = Napi::Object::New(info.Env());
             auto cppContextData = std::make_shared<CPPContextData>();
-            cppContextData->sdCtx = sdCtx;
+            if (!info[1].IsUndefined())
+            {
+                Napi::Function::CheckCast(info.Env(), info[1]);
+                cppContextData->logCallback = decltype(CPPContextData::logCallback)::New(info.Env(), info[1].As<Napi::Function>(), "node-stable-diffusion-cpp-log-callback", 1, 1);
+            }
 
-            ctx.DefineProperties({
-                    Napi::PropertyDescriptor::Function("dispose", [cppContextData](const Napi::CallbackInfo& info) 
-                    { 
+            if (!info[2].IsUndefined())
+            {
+                Napi::Function::CheckCast(info.Env(), info[2]);
+                cppContextData->logCallback = decltype(CPPContextData::logCallback)::New(info.Env(), info[2].As<Napi::Function>(), "node-stable-diffusion-cpp-progress-callback", 1, 1);
+            }
+
+            return queueStableDiffusionWorker(info.Env(), cppContextData, [=](CPPContextData& ctx)
+            {
+                ctx.sdCtx = { new_sd_ctx(model.c_str(), vae.c_str(), taesd.c_str(), controlNet.c_str(), loraDir.c_str(),
+                    embedDir.c_str(), stackedIdEmbedDir.c_str(), vaeDecodeOnly, vaeTiling, freeParamsImmediately, numThreads, weightType,
+                    cudaRng ? CUDA_RNG : STD_DEFAULT_RNG, schedule, keepClipOnCpu, keepControlNetOnCpu, keepVaeOnCpu), [](sd_ctx_t* c) { if (c) free_sd_ctx(c); } };
+
+                if (!ctx.sdCtx)
+                    throw std::runtime_error("Context creation failed");
+
+                return ctx.shared_from_this();
+            },
+            [](Napi::Env env, const std::shared_ptr<CPPContextData>& cppContextData)
+            {
+                auto ctx = Napi::Object::New(env);
+                ctx.DefineProperties({
+                    Napi::PropertyDescriptor::Function("dispose", [cppContextData](const Napi::CallbackInfo& info)
+                    {
                         if (!cppContextData->sdCtx)
                             throw Napi::Error::New(info.Env(), "Context disposed");
 
-                        cppContextData->sdCtx.reset(); 
-                    }),
-                    Napi::PropertyDescriptor::Function("setLogCallback", [cppContextData](const Napi::CallbackInfo& info) 
-                    {
-                        if (!cppContextData->sdCtx) 
-                            throw Napi::Error::New(info.Env(), "Context disposed");
-
-                        Napi::Function::CheckCast(info.Env(), info[0]);
-                        cppContextData->logCallback = decltype(CPPContextData::logCallback)::New(info.Env(), info[0].As<Napi::Function>(), "node-stable-diffusion-cpp-log-callback", 4, 1);
-                    }),
-                    Napi::PropertyDescriptor::Function("setProgressCallback", [cppContextData](const Napi::CallbackInfo& info) 
-                    {
-                        if (!cppContextData->sdCtx) 
-                            throw Napi::Error::New(info.Env(), "Context disposed");
-
-                        Napi::Function::CheckCast(info.Env(), info[0]);
-                        cppContextData->progressCallback = decltype(CPPContextData::progressCallback)::New(info.Env(), info[0].As<Napi::Function>(), "node-stable-diffusion-cpp-progress-callback", 4, 1);
+                        cppContextData->sdCtx.reset();
                     }),
                     Napi::PropertyDescriptor::Function("txt2img", [cppContextData](const Napi::CallbackInfo& info)
                     {
                         if (!cppContextData->sdCtx)
-                           throw Napi::Error::New(info.Env(), "Context disposed");
-
+                            throw Napi::Error::New(info.Env(), "Context disposed");
 
                         Napi::Value tmp;
                         const auto params = info[0].ToObject();
@@ -339,9 +348,10 @@ namespace
 
                         return queueStableDiffusionWorker(info.Env(), cppContextData, [=, controlCond = std::move(controlCond)](CPPContextData& ctx)
                         {
-                            return SdImageList(txt2img(ctx.sdCtx.get(), prompt.c_str(), negativePrompt.c_str(), clipSkip, cfgScale, width, height, sampleMethod, sampleSteps, seed, batchCount, controlCond.get(), controlStrength, styleRatio, normalizeInput, inputIdImagesPath.c_str()), batchCount);
+                            auto sdCtx = ctx.sdCtx; //keep it alive while we do this
+                            return SdImageList(txt2img(sdCtx.get(), prompt.c_str(), negativePrompt.c_str(), clipSkip, cfgScale, width, height, sampleMethod, sampleSteps, seed, batchCount, controlCond.get(), controlStrength, styleRatio, normalizeInput, inputIdImagesPath.c_str()), batchCount);
                         },
-                        [batchCount](Napi::Env env, SdImageList&& images) 
+                        [batchCount](Napi::Env env, SdImageList&& images)
                         {
                             auto arr = Napi::Array::New(env, batchCount);
                             for (int b = 0; b < batchCount; b++)
@@ -352,8 +362,9 @@ namespace
                         });
                     }),
                 });
-
-            return ctx;
+                ctx.Freeze();
+                return ctx;
+            });
         }
 
         Napi::Value getSystemInfo(const Napi::CallbackInfo& info)

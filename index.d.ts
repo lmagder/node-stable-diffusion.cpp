@@ -8,8 +8,6 @@ declare module "node-stable-diffusion.cpp" {
 
   export type Context = Readonly<{
     dispose: () => void;
-    setLogCallback: (callback: (level: string, msg: string) => void) => void;
-    setProgressCallback: (callback: (step: number, steps: number, time: number) => void) => void;
     txt2img: (params: {
       prompt: string;
       negativePrompt?: string;
@@ -29,25 +27,29 @@ declare module "node-stable-diffusion.cpp" {
     }) => Promise<Image[]>;
   }>;
 
-  export const createContext: (params: {
-    model: string;
-    vae?: string;
-    taesd?: string;
-    controlNet?: string;
-    loraDir?: string;
-    embedDir?: string;
-    stackedIdEmbedDir?: string;
-    vaeDecodeOnly?: boolean;
-    vaeTiling?: boolean;
-    freeParamsImmediately?: boolean;
-    numThreads?: number;
-    weightType?: number;
-    cudaRng?: boolean;
-    schedule?: number;
-    keepClipOnCpu?: boolean;
-    keepControlNetOnCpu?: boolean;
-    keepVaeOnCpu?: boolean;
-  }) => Context;
+  export const createContext: (
+    params: {
+      model: string;
+      vae?: string;
+      taesd?: string;
+      controlNet?: string;
+      loraDir?: string;
+      embedDir?: string;
+      stackedIdEmbedDir?: string;
+      vaeDecodeOnly?: boolean;
+      vaeTiling?: boolean;
+      freeParamsImmediately?: boolean;
+      numThreads?: number;
+      weightType?: number;
+      cudaRng?: boolean;
+      schedule?: number;
+      keepClipOnCpu?: boolean;
+      keepControlNetOnCpu?: boolean;
+      keepVaeOnCpu?: boolean;
+    },
+    logCallback?: (level: "error" | "warn" | "info" | "debug", msg: string) => void,
+    progressCallback?: (step: number, steps: number, time: number) => void
+  ) => Promise<Context>;
 
   export const getSystemInfo: () => string;
   export const getNumPhysicalCores: () => number;
