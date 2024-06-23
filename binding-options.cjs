@@ -1,4 +1,4 @@
 module.exports = {
-  name: "node-stable-diffusion.cpp",
+  name: "node-stable-diffusion-cpp",
   napi_versions: [9],
 };

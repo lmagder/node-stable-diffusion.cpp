@@ -1,38 +1,39 @@
 import { parseArgs } from "node:util";
-import * as fs from "node:fs";
-import { PNG } from "pngjs";
-import sd from "node-stable-diffusion.cpp";
+import sharp from "sharp";
+import sd from "node-stable-diffusion-cpp";
 
-const main = async () => {
-  const args = parseArgs({
-    options: {
-      model: { type: "string", short: "m" },
-      prompt: { type: "string", short: "p" },
-      output: { type: "string", short: "o" },
-    },
-  });
+const args = parseArgs({
+  options: {
+    model: { type: "string", short: "m" },
+    prompt: { type: "string", short: "p" },
+    output: { type: "string", short: "o" },
+    width: { type: "string", short: "w" },
+    height: { type: "string", short: "h" },
+    batchCount: { type: "string", short: "b" },
+  },
+});
 
-  if (!args.values.model) {
-    console.error("Missing model param");
-    process.exit(1);
-  }
+if (!args.values.model) {
+  console.error("Missing model param");
+  process.exit(1);
+}
 
-  const model = args.values.model;
-  const prompt = args.values.prompt ?? "A picture of a dog";
-  const output = args.values.output ?? "out";
+const model = args.values.model;
+const prompt = args.values.prompt ?? "A picture of a dog";
+const output = args.values.output ?? `out/${prompt}`;
+const width = Number.parseInt(args.values.width ?? "768");
+const height = Number.parseInt(args.values.height ?? "768");
+const batchCount = Number.parseInt(args.values.batchCount ?? "1");
 
-  const ctx = await sd.createContext({ model }, (level, text) => console[level](text));
+const ctx = await sd.createContext({ model }, (level, text) => console[level](text));
 
-  const images = await ctx.txt2img({ prompt, batchCount: 2 });
-  for (const [idx, img] of images.entries()) {
-    const fname = `${output}_${idx}.png`;
-    const p = new PNG({ width: img.width, height: img.height, inputHasAlpha: img.channel === 4, colorType: 2 });
-    p.data = img.data;
-    p.pack().pipe(fs.createWriteStream(fname));
-    console.info(`Wrote ${fname}`);
-  }
+const images = await ctx.txt2img({ prompt, batchCount, width, height });
+for (const [idx, img] of images.entries()) {
+  const fname = `${output}_${idx}.jpg`;
+  await sharp(img.data, { raw: { width: img.width, height: img.height, channels: img.channel } })
+    .jpeg()
+    .toFile(fname);
+  console.info(`Wrote ${fname}`);
+}
 
-  ctx.dispose();
-};
-
-main();
+ctx.dispose();

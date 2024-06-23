@@ -1,5 +1,5 @@
 {
-  "name": "node-stable-diffusion.cpp",
+  "name": "node-stable-diffusion-cpp",
   "version": "0.1.0",
   "description": "Node bindings for https://github.com/leejet/stable-diffusion.cpp",
   "scripts": {
@@ -28,7 +28,7 @@
     "cmake-js": "7.3.0",
     "node-addon-api": "8.0.0",
     "pkg-prebuilds": "1.0.0",
-    "pngjs": "7.0.0"
+    "sharp": "0.33.4"
   },
   "devDependencies": {
     "@tsconfig/node18": "18.2.4",

@@ -1,8 +1,8 @@
-declare module "node-stable-diffusion.cpp" {
+declare module "node-stable-diffusion-cpp" {
   export type Image = Readonly<{
     width: number;
     height: number;
-    channel: number;
+    channel: 3 | 4;
     data: Buffer;
   }>;
 
