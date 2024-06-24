@@ -1,4 +1,7 @@
 import { parseArgs } from "node:util";
+import { mkdir } from "node:fs/promises";
+import { dirname } from "node:path";
+
 import sharp from "sharp";
 import sd from "node-stable-diffusion-cpp";
 
@@ -19,7 +22,7 @@ if (!args.values.model) {
 }
 
 const model = args.values.model;
-const prompt = args.values.prompt ?? "A picture of a dog";
+const prompt = args.values.prompt ?? "a picture of a dog";
 const output = args.values.output ?? `out/${prompt}`;
 const width = Number.parseInt(args.values.width ?? "768");
 const height = Number.parseInt(args.values.height ?? "768");
@@ -30,6 +33,7 @@ const ctx = await sd.createContext({ model }, (level, text) => console[level](te
 const images = await ctx.txt2img({ prompt, batchCount, width, height });
 for (const [idx, img] of images.entries()) {
   const fname = `${output}_${idx}.jpg`;
+  await mkdir(dirname(fname), { recursive: true });
   await sharp(img.data, { raw: { width: img.width, height: img.height, channels: img.channel } })
     .jpeg()
     .toFile(fname);

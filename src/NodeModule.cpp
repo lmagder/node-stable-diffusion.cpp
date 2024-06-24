@@ -314,14 +314,14 @@ namespace
             {
                 auto ctx = Napi::Object::New(env);
                 ctx.DefineProperties({
-                    Napi::PropertyDescriptor::Function("dispose", [cppContextData](const Napi::CallbackInfo& info)
+                    Napi::PropertyDescriptor::Function(env, Napi::Object(), "dispose", [cppContextData](const Napi::CallbackInfo& info)
                     {
                         if (!cppContextData->sdCtx)
                             throw Napi::Error::New(info.Env(), "Context disposed");
 
                         cppContextData->sdCtx.reset();
                     }),
-                    Napi::PropertyDescriptor::Function("txt2img", [cppContextData](const Napi::CallbackInfo& info)
+                    Napi::PropertyDescriptor::Function(env, Napi::Object(), "txt2img", [cppContextData](const Napi::CallbackInfo& info)
                     {
                         if (!cppContextData->sdCtx)
                             throw Napi::Error::New(info.Env(), "Context disposed");
