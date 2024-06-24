@@ -30,7 +30,7 @@ const batchCount = Number.parseInt(args.values.batchCount ?? "1");
 
 const ctx = await sd.createContext({ model }, (level, text) => console[level](text));
 
-const images = await ctx.txt2img({ prompt, batchCount, width, height });
+const images = await ctx.txt2img({ prompt, batchCount, width, height, sampleMethod: sd.SampleMethod.LCM });
 for (const [idx, img] of images.entries()) {
   const fname = `${output}_${idx}.jpg`;
   await mkdir(dirname(fname), { recursive: true });

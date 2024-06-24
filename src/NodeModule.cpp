@@ -255,13 +255,75 @@ namespace
             sd_set_log_callback(&stableDiffusionLogFunc, nullptr);
             sd_set_progress_callback(&stableDiffusionProgressFunc, nullptr);
 
+            auto sampleMethodEnum = Napi::Object::New(env);
+            sampleMethodEnum.DefineProperties(
+            {
+                Napi::PropertyDescriptor::Value("EulerA", Napi::Number::New(env, EULER_A)),
+                Napi::PropertyDescriptor::Value("Euler", Napi::Number::New(env, EULER)),
+                Napi::PropertyDescriptor::Value("Heun", Napi::Number::New(env, HEUN)),
+                Napi::PropertyDescriptor::Value("DPM2", Napi::Number::New(env, DPM2)),
+                Napi::PropertyDescriptor::Value("DPMPP2SA", Napi::Number::New(env, DPMPP2S_A)),
+                Napi::PropertyDescriptor::Value("DPMPP2M", Napi::Number::New(env, DPMPP2M)),
+                Napi::PropertyDescriptor::Value("DPMPP2Mv2", Napi::Number::New(env, DPMPP2Mv2)),
+                Napi::PropertyDescriptor::Value("LCM", Napi::Number::New(env, LCM)),
+             });
+            sampleMethodEnum.Freeze();
+
+            auto scheduleEnum = Napi::Object::New(env);
+            scheduleEnum.DefineProperties(
+            {
+                Napi::PropertyDescriptor::Value("Default", Napi::Number::New(env, DEFAULT)),
+                Napi::PropertyDescriptor::Value("Discrete", Napi::Number::New(env, DISCRETE)),
+                Napi::PropertyDescriptor::Value("Karras", Napi::Number::New(env, KARRAS)),
+                Napi::PropertyDescriptor::Value("AYS", Napi::Number::New(env, AYS)),
+            });
+            scheduleEnum.Freeze();
+
+            auto typeEnum = Napi::Object::New(env);
+            typeEnum.DefineProperties(
+            {
+                Napi::PropertyDescriptor::Value("F32", Napi::Number::New(env, SD_TYPE_F32)),
+                Napi::PropertyDescriptor::Value("F16", Napi::Number::New(env, SD_TYPE_F16)),
+                Napi::PropertyDescriptor::Value("Q4_0", Napi::Number::New(env, SD_TYPE_Q4_0)),
+                Napi::PropertyDescriptor::Value("Q4_1", Napi::Number::New(env, SD_TYPE_Q4_1)),
+                Napi::PropertyDescriptor::Value("Q5_0", Napi::Number::New(env, SD_TYPE_Q5_0)),
+                Napi::PropertyDescriptor::Value("Q5_1", Napi::Number::New(env, SD_TYPE_Q5_1)),
+                Napi::PropertyDescriptor::Value("Q8_0", Napi::Number::New(env, SD_TYPE_Q8_0)),
+                Napi::PropertyDescriptor::Value("Q8_1", Napi::Number::New(env, SD_TYPE_Q8_1)),
+                Napi::PropertyDescriptor::Value("Q2_K", Napi::Number::New(env, SD_TYPE_Q2_K)),
+                Napi::PropertyDescriptor::Value("Q3_K", Napi::Number::New(env, SD_TYPE_Q3_K)),
+                Napi::PropertyDescriptor::Value("Q4_K", Napi::Number::New(env, SD_TYPE_Q4_K)),
+                Napi::PropertyDescriptor::Value("Q5_K", Napi::Number::New(env, SD_TYPE_Q5_K)),
+                Napi::PropertyDescriptor::Value("Q6_K", Napi::Number::New(env, SD_TYPE_Q6_K)),
+                Napi::PropertyDescriptor::Value("Q8_K", Napi::Number::New(env, SD_TYPE_Q8_K)),
+                Napi::PropertyDescriptor::Value("IQ2_XXS", Napi::Number::New(env, SD_TYPE_IQ2_XXS)),
+                Napi::PropertyDescriptor::Value("IQ2_XS", Napi::Number::New(env, SD_TYPE_IQ2_XS)),
+                Napi::PropertyDescriptor::Value("IQ3_XXS", Napi::Number::New(env, SD_TYPE_IQ3_XXS)),
+                Napi::PropertyDescriptor::Value("IQ1_S", Napi::Number::New(env, SD_TYPE_IQ1_S)),
+                Napi::PropertyDescriptor::Value("IQ4_NL", Napi::Number::New(env, SD_TYPE_IQ4_NL)),
+                Napi::PropertyDescriptor::Value("IQ3_S", Napi::Number::New(env, SD_TYPE_IQ3_S)),
+                Napi::PropertyDescriptor::Value("IQ2_S", Napi::Number::New(env, SD_TYPE_IQ2_S)),
+                Napi::PropertyDescriptor::Value("IQ4_XS", Napi::Number::New(env, SD_TYPE_IQ4_XS)),
+                Napi::PropertyDescriptor::Value("I8", Napi::Number::New(env, SD_TYPE_I8)),
+                Napi::PropertyDescriptor::Value("I16", Napi::Number::New(env, SD_TYPE_I16)),
+                Napi::PropertyDescriptor::Value("I32", Napi::Number::New(env, SD_TYPE_I32)),
+                Napi::PropertyDescriptor::Value("I64", Napi::Number::New(env, SD_TYPE_I64)),
+                Napi::PropertyDescriptor::Value("F64", Napi::Number::New(env, SD_TYPE_F64)),
+                Napi::PropertyDescriptor::Value("IQ1_M", Napi::Number::New(env, SD_TYPE_IQ1_M)),
+                Napi::PropertyDescriptor::Value("BF16", Napi::Number::New(env, SD_TYPE_BF16)),
+            });
+            typeEnum.Freeze();
+
             DefineAddon(exports,
-                {
-                    InstanceMethod("createContext", &NodeStableDiffusionCpp::createContext),
-                    InstanceMethod("getSystemInfo", &NodeStableDiffusionCpp::getSystemInfo),
-                    InstanceMethod("getNumPhysicalCores", &NodeStableDiffusionCpp::getNumPhysicalCores),
-                    InstanceMethod("weightTypeName", &NodeStableDiffusionCpp::weightTypeName),
-                });
+            {
+                InstanceValue("SampleMethod", sampleMethodEnum),
+                InstanceValue("Schedule", scheduleEnum),
+                InstanceValue("Type", typeEnum),
+                InstanceMethod("createContext", &NodeStableDiffusionCpp::createContext),
+                InstanceMethod("getSystemInfo", &NodeStableDiffusionCpp::getSystemInfo),
+                InstanceMethod("getNumPhysicalCores", &NodeStableDiffusionCpp::getNumPhysicalCores),
+                InstanceMethod("weightTypeName", &NodeStableDiffusionCpp::weightTypeName),
+            });
         }
     protected:
         Napi::Value createContext(const Napi::CallbackInfo& info)
