@@ -7,7 +7,7 @@ declare module "node-stable-diffusion-cpp" {
   }>;
 
   export type Context = Readonly<{
-    dispose: () => void;
+    dispose: () => Promise<void>;
     txt2img: (params: {
       prompt: string;
       negativePrompt?: string;

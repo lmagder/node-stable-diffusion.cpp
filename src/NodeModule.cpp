@@ -46,8 +46,6 @@ namespace
         callback.Call({ Napi::Number::From(env, dataPtr->step), Napi::Number::From(env, dataPtr->steps) , Napi::Number::From(env, dataPtr->time) });
     }
 
-    void stableDiffusionLogFunc(enum sd_log_level_t level, const char* text, void* data);
-
     struct CPPContextData : public std::enable_shared_from_this<CPPContextData>
     {
         std::shared_ptr<sd_ctx_t> sdCtx;
@@ -63,16 +61,7 @@ namespace
 
         ~CPPContextData()
         {
-            sdCtx.reset();
-
-            if (progressCallback)
-                progressCallback.Release();
-
-            if (logCallback)
-            {
-                stableDiffusionLogFunc(SD_LOG_DEBUG, "Closing node context", nullptr);
-                logCallback.Release();
-            }
+            reset();
         }
 
         void nextTask()
@@ -82,6 +71,23 @@ namespace
                 auto begin = pendingTasks.begin();
                 begin->release()->Queue();
                 pendingTasks.erase(begin);
+            }
+        }
+
+        void reset()
+        {
+            sdCtx.reset();
+
+            if (progressCallback)
+            {
+                progressCallback.Abort();
+                progressCallback = {};
+            }
+
+            if (logCallback)
+            {
+                logCallback.Abort();
+                logCallback = {};
             }
         }
     };
@@ -320,6 +326,16 @@ namespace
                             throw Napi::Error::New(info.Env(), "Context disposed");
 
                         cppContextData->sdCtx.reset();
+
+                        return queueStableDiffusionWorker(info.Env(), cppContextData, [](CPPContextData& ctx)
+                        {
+                           return ctx.shared_from_this();
+                        },
+                        [](Napi::Env env, const std::shared_ptr<CPPContextData>& cppContextData)
+                        {
+                            cppContextData->reset();
+                            return env.Undefined();
+                        });
                     }),
                     Napi::PropertyDescriptor::Function(env, Napi::Object(), "txt2img", [cppContextData](const Napi::CallbackInfo& info)
                     {
@@ -346,9 +362,8 @@ namespace
                         if (sampleMethod >= N_SAMPLE_METHODS)
                             throw Napi::Error::New(info.Env(), "Invalid sampleMethod");
 
-                        return queueStableDiffusionWorker(info.Env(), cppContextData, [=, controlCond = std::move(controlCond)](CPPContextData& ctx)
+                        return queueStableDiffusionWorker(info.Env(), cppContextData, [=, sdCtx = cppContextData->sdCtx, controlCond = std::move(controlCond)](CPPContextData& ctx)
                         {
-                            auto sdCtx = ctx.sdCtx; //keep it alive while we do this
                             return SdImageList(txt2img(sdCtx.get(), prompt.c_str(), negativePrompt.c_str(), clipSkip, cfgScale, width, height, sampleMethod, sampleSteps, seed, batchCount, controlCond.get(), controlStrength, styleRatio, normalizeInput, inputIdImagesPath.c_str()), batchCount);
                         },
                         [batchCount](Napi::Env env, SdImageList&& images)

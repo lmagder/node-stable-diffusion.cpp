@@ -40,4 +40,4 @@ for (const [idx, img] of images.entries()) {
   console.info(`Wrote ${fname}`);
 }
 
-ctx.dispose();
+await ctx.dispose();
