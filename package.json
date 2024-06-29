@@ -19,7 +19,7 @@
   "types": "./index.d.ts",
   "type": "module",
   "exports": {
-    ".": "./index.cjs"
+    ".": "./index.js"
   },
   "files": [
     "./dist"
