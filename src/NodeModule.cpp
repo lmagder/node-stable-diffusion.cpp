@@ -49,6 +49,7 @@ namespace
     struct CPPContextData : public std::enable_shared_from_this<CPPContextData>
     {
         std::shared_ptr<sd_ctx_t> sdCtx;
+        std::shared_ptr<upscaler_ctx_t> upscalerCtx;
         Napi::TypedThreadSafeFunction<std::nullptr_t, callJsLogArgs, callJsLog> logCallback;
         Napi::TypedThreadSafeFunction<std::nullptr_t, callJsProgressArgs, callJsProgress> progressCallback;
         std::vector<std::unique_ptr<Napi::AsyncWorker>> pendingTasks;
@@ -77,6 +78,7 @@ namespace
         void reset()
         {
             sdCtx.reset();
+            upscalerCtx.reset();
 
             if (progressCallback)
             {
@@ -418,7 +420,7 @@ namespace
                         const auto batchCount = (tmp = params.Get("batchCount"), tmp.IsUndefined() ? 1 : tmp.ToNumber().Int32Value());
                         auto controlCond = (tmp = params.Get("controlCond"), tmp.IsUndefined() ? SdImage() : extractSdImage(tmp.ToObject()));
                         const auto controlStrength = (tmp = params.Get("controlStrength"), tmp.IsUndefined() ? 0.0f : tmp.ToNumber().FloatValue());
-                        const auto styleRatio = (tmp = params.Get("styleRatio"), tmp.IsUndefined() ? 0.0f : tmp.ToNumber().FloatValue());
+                        const auto styleRatio = (tmp = params.Get("styleRatio"), tmp.IsUndefined() ? 20.0f : tmp.ToNumber().FloatValue());
                         const auto normalizeInput = (tmp = params.Get("normalizeInput"), tmp.IsUndefined() ? false : tmp.ToBoolean().Value());
                         const auto inputIdImagesPath = (tmp = params.Get("inputIdImagesPath"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value());
                         if (sampleMethod >= N_SAMPLE_METHODS)
@@ -432,6 +434,84 @@ namespace
                         {
                             auto arr = Napi::Array::New(env, batchCount);
                             for (int b = 0; b < batchCount; b++)
+                            {
+                                arr[b] = wrapSdImage(env, images[b]);
+                            }
+                            return arr;
+                        });
+                    }),
+                    Napi::PropertyDescriptor::Function(env, Napi::Object(), "img2img", [cppContextData](const Napi::CallbackInfo& info)
+                    {
+                        if (!cppContextData->sdCtx)
+                            throw Napi::Error::New(info.Env(), "Context disposed");
+
+                        Napi::Value tmp;
+                        const auto params = info[0].ToObject();
+                        auto initImage = (tmp = params.Get("initImage"), tmp.IsUndefined() ? SdImage() : extractSdImage(tmp.ToObject()));
+                        const auto prompt = params.Get("prompt").ToString().Utf8Value();
+                        const auto negativePrompt = (tmp = params.Get("negativePrompt"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value());
+                        const auto clipSkip = (tmp = params.Get("clipSkip"), tmp.IsUndefined() ? -1 : tmp.ToNumber().Int32Value());
+                        const auto cfgScale = (tmp = params.Get("cfgScale"), tmp.IsUndefined() ? 7.0f : tmp.ToNumber().FloatValue());
+                        const auto width = (tmp = params.Get("width"), tmp.IsUndefined() ? initImage->width : tmp.ToNumber().Int32Value());
+                        const auto height = (tmp = params.Get("height"), tmp.IsUndefined() ? initImage->height : tmp.ToNumber().Int32Value());
+                        const auto sampleMethod = (tmp = params.Get("sampleMethod"), tmp.IsUndefined() ? EULER_A : sample_method_t(tmp.ToNumber().Uint32Value()));
+                        const auto sampleSteps = (tmp = params.Get("sampleSteps"), tmp.IsUndefined() ? 20 : tmp.ToNumber().Int32Value());
+                        const auto strength = (tmp = params.Get("strength"), tmp.IsUndefined() ? 0.75f : tmp.ToNumber().FloatValue());
+                        const auto seed = (tmp = params.Get("seed"), tmp.IsUndefined() ? 42 : tmp.ToNumber().Int64Value());
+                        const auto batchCount = (tmp = params.Get("batchCount"), tmp.IsUndefined() ? 1 : tmp.ToNumber().Int32Value());
+                        auto controlCond = (tmp = params.Get("controlCond"), tmp.IsUndefined() ? SdImage() : extractSdImage(tmp.ToObject()));
+                        const auto controlStrength = (tmp = params.Get("controlStrength"), tmp.IsUndefined() ? 0.0f : tmp.ToNumber().FloatValue());
+                        const auto styleRatio = (tmp = params.Get("styleRatio"), tmp.IsUndefined() ? 20.0f : tmp.ToNumber().FloatValue());
+                        const auto normalizeInput = (tmp = params.Get("normalizeInput"), tmp.IsUndefined() ? false : tmp.ToBoolean().Value());
+                        const auto inputIdImagesPath = (tmp = params.Get("inputIdImagesPath"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value());
+                        if (sampleMethod >= N_SAMPLE_METHODS)
+                            throw Napi::Error::New(info.Env(), "Invalid sampleMethod");
+
+                        return queueStableDiffusionWorker(info.Env(), cppContextData, [=, sdCtx = cppContextData->sdCtx, initImage = std::move(initImage), controlCond = std::move(controlCond)](CPPContextData& ctx)
+                        {
+                            return SdImageList(img2img(sdCtx.get(), *initImage, prompt.c_str(), negativePrompt.c_str(), clipSkip, cfgScale, width, height, sampleMethod, sampleSteps, strength, seed, batchCount, controlCond.get(), controlStrength, styleRatio, normalizeInput, inputIdImagesPath.c_str()), batchCount);
+                        },
+                        [batchCount](Napi::Env env, SdImageList&& images)
+                        {
+                            auto arr = Napi::Array::New(env, batchCount);
+                            for (int b = 0; b < batchCount; b++)
+                            {
+                                arr[b] = wrapSdImage(env, images[b]);
+                            }
+                            return arr;
+                        });
+                    }),
+                    Napi::PropertyDescriptor::Function(env, Napi::Object(), "img2vid", [cppContextData](const Napi::CallbackInfo& info)
+                    {
+                        if (!cppContextData->sdCtx)
+                            throw Napi::Error::New(info.Env(), "Context disposed");
+
+                        Napi::Value tmp;
+                        const auto params = info[0].ToObject();
+                        auto initImage = (tmp = params.Get("initImage"), tmp.IsUndefined() ? SdImage() : extractSdImage(tmp.ToObject()));
+                        const auto width = (tmp = params.Get("width"), tmp.IsUndefined() ? initImage->width : tmp.ToNumber().Int32Value());
+                        const auto height = (tmp = params.Get("height"), tmp.IsUndefined() ? initImage->height : tmp.ToNumber().Int32Value());
+                        const auto videoFrames = (tmp = params.Get("videoFrames"), tmp.IsUndefined() ? 6 : tmp.ToNumber().Int32Value());
+                        const auto motionBucketId = (tmp = params.Get("motionBucketId"), tmp.IsUndefined() ? 127 : tmp.ToNumber().Int32Value());
+                        const auto fps = (tmp = params.Get("fps"), tmp.IsUndefined() ? 6 : tmp.ToNumber().Int32Value());
+                        const auto augmentationLevel = (tmp = params.Get("augmentationLevel"), tmp.IsUndefined() ? 0.0f : tmp.ToNumber().FloatValue());
+                        const auto minCfg = (tmp = params.Get("minCfg"), tmp.IsUndefined() ? 1.0f : tmp.ToNumber().FloatValue());
+                        const auto cfgScale = (tmp = params.Get("cfgScale"), tmp.IsUndefined() ? 7.0f : tmp.ToNumber().FloatValue());
+                        const auto sampleMethod = (tmp = params.Get("sampleMethod"), tmp.IsUndefined() ? EULER_A : sample_method_t(tmp.ToNumber().Uint32Value()));
+                        const auto sampleSteps = (tmp = params.Get("sampleSteps"), tmp.IsUndefined() ? 20 : tmp.ToNumber().Int32Value());
+                        const auto strength = (tmp = params.Get("strength"), tmp.IsUndefined() ? 0.75f : tmp.ToNumber().FloatValue());
+                        const auto seed = (tmp = params.Get("seed"), tmp.IsUndefined() ? 42 : tmp.ToNumber().Int64Value());
+                        if (sampleMethod >= N_SAMPLE_METHODS)
+                            throw Napi::Error::New(info.Env(), "Invalid sampleMethod");
+
+                        return queueStableDiffusionWorker(info.Env(), cppContextData, [=, sdCtx = cppContextData->sdCtx, initImage = std::move(initImage)](CPPContextData& ctx)
+                        {
+                            return SdImageList(img2vid(sdCtx.get(), *initImage, width, height, videoFrames, motionBucketId, fps, augmentationLevel, minCfg, cfgScale, sampleMethod, sampleSteps, strength, seed), videoFrames);
+                        },
+                        [videoFrames](Napi::Env env, SdImageList&& images)
+                        {
+                            auto arr = Napi::Array::New(env, videoFrames);
+                            for (int b = 0; b < videoFrames; b++)
                             {
                                 arr[b] = wrapSdImage(env, images[b]);
                             }

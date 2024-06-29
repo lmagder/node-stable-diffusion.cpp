@@ -75,6 +75,40 @@ declare module "node-stable-diffusion-cpp" {
       normalizeInput?: boolean;
       inputIdImagesPath?: string;
     }) => Promise<Image[]>;
+    img2img: (params: {
+      initImage: Image;
+      prompt: string;
+      negativePrompt?: string;
+      clipSkip?: number;
+      cfgScale?: number;
+      width?: number;
+      height?: number;
+      sampleMethod?: SampleMethod;
+      sampleSteps?: number;
+      strength?: number;
+      seed?: number;
+      batchCount?: number;
+      controlCond?: Image;
+      controlStrength?: number;
+      styleRatio?: number;
+      normalizeInput?: boolean;
+      inputIdImagesPath?: string;
+    }) => Promise<Image[]>;
+    img2vid: (params: {
+      initImage: Image;
+      width?: number;
+      height?: number;
+      videoFrames?: number;
+      motionBucketId?: number;
+      fps?: number;
+      augmentationLevel?: number;
+      minCfg?: number;
+      cfgScale?: number;
+      sampleMethod?: SampleMethod;
+      sampleSteps?: number;
+      strength?: number;
+      seed?: number;
+    }) => Promise<Image[]>;
   }>;
 
   export const createContext: (
