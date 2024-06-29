@@ -6,7 +6,7 @@
     "install": "pkg-prebuilds-verify ./binding-options.cjs || cmake-js compile",
     "build": "tsc --build && cmake-js build",
     "rebuild": "tsc --build --clean && cmake-js rebuild",
-    "cli": "node dist/cli.js"
+    "cli": "node build/cli.js"
   },
   "binary": {
     "napi_versions": [
@@ -22,7 +22,7 @@
     ".": "./index.js"
   },
   "files": [
-    "./dist",
+    "./build/*.js",
     "./build/Release"
   ],
   "dependencies": {
