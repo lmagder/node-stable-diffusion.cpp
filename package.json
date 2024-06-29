@@ -8,6 +8,9 @@
     "rebuild": "tsc --build --clean && cmake-js rebuild",
     "cli": "node build/cli.js"
   },
+  "bin": {
+    "node-sd": "build/cli.js"
+  },
   "binary": {
     "napi_versions": [
       9
