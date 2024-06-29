@@ -135,6 +135,19 @@ declare module "node-stable-diffusion-cpp" {
     progressCallback?: (step: number, steps: number, time: number) => void
   ) => Promise<Context>;
 
+  export type Upscaler = Readonly<{
+    dispose: () => Promise<void>;
+    upscale: (inputImage: Image, upscaleFactor: number) => Promise<Image>;
+  }>;
+
+  export const createUpscaler: (
+    esrganPath: string,
+    numThreads?: number,
+    weightType?: Type,
+    logCallback?: (level: "error" | "warn" | "info" | "debug", msg: string) => void,
+    progressCallback?: (step: number, steps: number, time: number) => void
+  ) => Promise<Upscaler>;
+
   export const getSystemInfo: () => string;
   export const getNumPhysicalCores: () => number;
   export const weightTypeName: (weightType: number) => string;

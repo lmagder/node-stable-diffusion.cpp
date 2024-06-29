@@ -322,6 +322,7 @@ namespace
                 InstanceValue("Schedule", scheduleEnum),
                 InstanceValue("Type", typeEnum),
                 InstanceMethod("createContext", &NodeStableDiffusionCpp::createContext),
+                InstanceMethod("createUpscaler", &NodeStableDiffusionCpp::createUpscaler),
                 InstanceMethod("getSystemInfo", &NodeStableDiffusionCpp::getSystemInfo),
                 InstanceMethod("getNumPhysicalCores", &NodeStableDiffusionCpp::getNumPhysicalCores),
                 InstanceMethod("weightTypeName", &NodeStableDiffusionCpp::weightTypeName),
@@ -541,6 +542,81 @@ namespace
                 throw Napi::Error::New(info.Env(), "Invalid weightType");
 
             return Napi::String::New(info.Env(), sd_type_name(weightType));
+        }
+
+        Napi::Value createUpscaler(const Napi::CallbackInfo& info)
+        {
+            const auto esrganPath = info[0].ToString().Utf8Value();
+            const auto numThreads = info[1].IsUndefined() ? GGML_DEFAULT_N_THREADS : info[1].ToNumber().Int32Value();
+            const auto weightType = info[2].IsUndefined() ? SD_TYPE_F32 : sd_type_t(info[2].ToNumber().Uint32Value());
+            if (weightType >= SD_TYPE_COUNT)
+                throw Napi::Error::New(info.Env(), "Invalid weightType");
+
+            auto cppContextData = std::make_shared<CPPContextData>();
+            if (!info[3].IsUndefined())
+            {
+                Napi::Function::CheckCast(info.Env(), info[3]);
+                cppContextData->logCallback = decltype(CPPContextData::logCallback)::New(info.Env(), info[3].As<Napi::Function>(), "node-stable-diffusion-cpp-log-callback", 1, 1);
+            }
+
+            if (!info[4].IsUndefined())
+            {
+                Napi::Function::CheckCast(info.Env(), info[4]);
+                cppContextData->logCallback = decltype(CPPContextData::logCallback)::New(info.Env(), info[4].As<Napi::Function>(), "node-stable-diffusion-cpp-progress-callback", 1, 1);
+            }
+
+            return queueStableDiffusionWorker(info.Env(), cppContextData, [=](CPPContextData& ctx)
+            {
+                ctx.upscalerCtx = { new_upscaler_ctx(esrganPath.c_str(), numThreads, weightType), [](upscaler_ctx_t* c) { if (c) free_upscaler_ctx(c); } };
+
+                if (!ctx.upscalerCtx)
+                    throw std::runtime_error("Context creation failed");
+
+                return ctx.shared_from_this();
+            },
+            [](Napi::Env env, const std::shared_ptr<CPPContextData>& cppContextData)
+            {
+                auto ctx = Napi::Object::New(env);
+                ctx.DefineProperties({
+                    Napi::PropertyDescriptor::Function(env, Napi::Object(), "dispose", [cppContextData](const Napi::CallbackInfo& info)
+                    {
+                        if (!cppContextData->upscalerCtx)
+                            throw Napi::Error::New(info.Env(), "Context disposed");
+
+                        cppContextData->upscalerCtx.reset();
+
+                        return queueStableDiffusionWorker(info.Env(), cppContextData, [](CPPContextData& ctx)
+                        {
+                            return ctx.shared_from_this();
+                        },
+                        [](Napi::Env env, const std::shared_ptr<CPPContextData>& cppContextData)
+                        {
+                            cppContextData->reset();
+                            return env.Undefined();
+                        });
+                    }),
+                    Napi::PropertyDescriptor::Function(env, Napi::Object(), "upscale", [cppContextData](const Napi::CallbackInfo& info)
+                    {
+                        if (!cppContextData->upscalerCtx)
+                            throw Napi::Error::New(info.Env(), "Context disposed");
+
+                        auto inputImage = extractSdImage(info[0].ToObject());
+                        const auto upscaleFactor = info[1].ToNumber().Uint32Value();
+                        return queueStableDiffusionWorker(info.Env(), cppContextData, [=, upscalerCtx = cppContextData->upscalerCtx, inputImage = std::move(inputImage)](CPPContextData& ctx)
+                        {
+                            auto img = (sd_image_t*)calloc(1, sizeof(sd_image_t));
+                            *img = upscale(upscalerCtx.get(), *inputImage, upscaleFactor);
+                            return SdImage(img);
+                        },
+                        [](Napi::Env env, SdImage&& image)
+                        {
+                            return wrapSdImage(env, *image);
+                        });
+                    }),
+                });
+                ctx.Freeze();
+                return ctx;
+            });
         }
     };
 }
