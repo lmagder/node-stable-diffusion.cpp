@@ -33,13 +33,21 @@ if (CUDAToolkit_FOUND)
   if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     set(CMAKE_CUDA_ARCHITECTURES "75;86;89")
   endif()
+  get_target_property(LIBCUDAPATH CUDA::cuda_driver IMPORTED_LOCATION)
+  if (${LIBCUDAPATH} STREQUAL "LIBCUDAPATH-NOTFOUND")
+    set(LIBCUDASTUB ${CMAKE_SYSROOT}/usr/local/cuda-${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR}/targets/x86_64-linux/lib/stubs/libcuda.so)
+    if (EXISTS ${LIBCUDASTUB})
+      message(STATUS "Can't find libcuda.so but have a valid toolkit. Asssuming we are using the stub")
+      set_target_properties(CUDA::cuda_driver PROPERTIES IMPORTED_LOCATION ${LIBCUDASTUB})
+    endif()
+  endif()
 endif()
 
 FetchContent_MakeAvailable(stable-diffusion-cpp)
 
 project(node-stable-diffusion-cpp)
 
-file(GLOB SOURCE_FILES "src/*.cpp" "src/*.h")
+file(GLOB SOURCE_FILES CONFIGURE_DEPENDS "src/*.cpp" "src/*.h")
 add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
 
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
@@ -55,12 +63,14 @@ if(MSVC AND CMAKE_JS_NODELIB_DEF AND CMAKE_JS_NODELIB_TARGET)
   execute_process(COMMAND ${CMAKE_AR} /def:${CMAKE_JS_NODELIB_DEF} /out:${CMAKE_JS_NODELIB_TARGET} ${CMAKE_STATIC_LINKER_FLAGS})
 
   #copy cublas DLLs
-  add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${CUDAToolkit_TARGET_DIR}/bin/cublas64_${CUDAToolkit_VERSION_MAJOR}.dll $<TARGET_FILE_DIR:${PROJECT_NAME}>
-    COMMAND_EXPAND_LISTS
-  )
-  add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${CUDAToolkit_TARGET_DIR}/bin/cublasLt64_${CUDAToolkit_VERSION_MAJOR}.dll $<TARGET_FILE_DIR:${PROJECT_NAME}>
-    COMMAND_EXPAND_LISTS
-  )
+  if (SD_CUBLAS)
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy ${CUDAToolkit_TARGET_DIR}/bin/cublas64_${CUDAToolkit_VERSION_MAJOR}.dll $<TARGET_FILE_DIR:${PROJECT_NAME}>
+      COMMAND_EXPAND_LISTS
+    )
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy ${CUDAToolkit_TARGET_DIR}/bin/cublasLt64_${CUDAToolkit_VERSION_MAJOR}.dll $<TARGET_FILE_DIR:${PROJECT_NAME}>
+      COMMAND_EXPAND_LISTS
+    )
+  endif()
 endif()

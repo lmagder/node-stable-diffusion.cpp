@@ -1,0 +1,3 @@
+[submodule "cuda-cmake-github-actions"]
+	path = cuda-cmake-github-actions
+	url = https://github.com/lmagder/cuda-cmake-github-actions.git
