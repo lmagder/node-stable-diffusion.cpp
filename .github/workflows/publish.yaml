@@ -55,6 +55,7 @@ jobs:
     needs:
       - build
     runs-on: ubuntu-22.04
+    environment: "NPM Publish"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -71,9 +72,9 @@ jobs:
           name: node-addon-binary-*
       - run: npm ci
       - run: npm run tsbuild
-      # - run: npm publish --provenance --access public
-      #   env:
-      #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - run: npm pack
       - uses: actions/upload-artifact@v4
         with:
