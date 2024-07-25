@@ -47,6 +47,18 @@ FetchContent_MakeAvailable(stable-diffusion-cpp)
 
 project(node-stable-diffusion-cpp)
 
+if (SD_CUBLAS)
+    add_custom_target(ggml-prune)
+    add_custom_command(TARGET ggml-prune POST_BUILD VERBATIM
+        COMMAND ${CUDAToolkit_BIN_DIR}/nvprune "$<TARGET_FILE:ggml>" -o "$<TARGET_FILE:ggml>.tmp" -arch "$<TARGET_PROPERTY:ggml,CUDA_ARCHITECTURES>" 
+        COMMAND ${CMAKE_COMMAND} -E remove "$<TARGET_FILE:ggml>"
+        COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:ggml>.tmp" "$<TARGET_FILE:ggml>"
+        COMMAND ${CMAKE_COMMAND} -E remove "$<TARGET_FILE:ggml>.tmp"
+    )
+    add_dependencies(ggml-prune ggml)
+    add_dependencies(stable-diffusion ggml-prune)
+endif()
+
 file(GLOB SOURCE_FILES CONFIGURE_DEPENDS "src/*.cpp" "src/*.h")
 add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
 

@@ -1,4 +1,4 @@
-declare module "node-stable-diffusion-cpp" {
+declare module "@lmagder/node-stable-diffusion-cpp" {
   declare enum SampleMethod {
     EulerA,
     Euler,

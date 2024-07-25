@@ -3,7 +3,7 @@ import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import sharp from "sharp";
-import sd from "node-stable-diffusion-cpp";
+import sd from "@lmagder/node-stable-diffusion-cpp";
 
 const args = parseArgs({
   options: {
