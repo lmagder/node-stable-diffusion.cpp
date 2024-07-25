@@ -28,10 +28,6 @@ jobs:
         if: ${{contains(matrix.os, 'ubuntu')}}
         run: ./cuda-cmake-github-actions/scripts/actions/install_cuda_ubuntu.sh
         shell: bash
-      - name: Log CUDA (Linux)
-        if: ${{contains(matrix.os, 'ubuntu')}}
-        run: find /usr -name "libcuda.*" -print
-        shell: bash
       - name: Install CUDA (Windows)
         env:
           cuda: "12.5.1"
