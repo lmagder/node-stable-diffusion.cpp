@@ -51,7 +51,7 @@ FetchContent_MakeAvailable(stable-diffusion-cpp)
 
 project(node-stable-diffusion-cpp)
 
-if (SD_CUBLAS)
+if (SD_CUBLAS AND 0)
     set(NVPRUNE_ARCH_LIST $<LIST:TRANSFORM,$<TARGET_PROPERTY:ggml,CUDA_ARCHITECTURES>,PREPEND,code=sm_> $<LIST:TRANSFORM,$<TARGET_PROPERTY:ggml,CUDA_ARCHITECTURES>,PREPEND,code=compute_>)
     set(NVPRUNE_ARCH -gencode $<JOIN:${NVPRUNE_ARCH_LIST},\ -gencode\ >)
     add_custom_target(ggml-prune)
