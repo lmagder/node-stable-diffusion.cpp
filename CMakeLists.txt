@@ -48,9 +48,12 @@ FetchContent_MakeAvailable(stable-diffusion-cpp)
 project(node-stable-diffusion-cpp)
 
 if (SD_CUBLAS)
+    set(NVPRUNE_ARCH_LIST $<LIST:TRANSFORM,$<TARGET_PROPERTY:ggml,CUDA_ARCHITECTURES>,PREPEND,code=sm_> $<LIST:TRANSFORM,$<TARGET_PROPERTY:ggml,CUDA_ARCHITECTURES>,PREPEND,code=compute_>)
+    set(NVPRUNE_ARCH -gencode $<JOIN:${NVPRUNE_ARCH_LIST},\ -gencode\ >)
     add_custom_target(ggml-prune)
-    add_custom_command(TARGET ggml-prune POST_BUILD VERBATIM
-        COMMAND ${CUDAToolkit_BIN_DIR}/nvprune "$<TARGET_FILE:ggml>" -o "$<TARGET_FILE:ggml>.tmp" -arch "$<TARGET_PROPERTY:ggml,CUDA_ARCHITECTURES>" 
+    add_custom_command(TARGET ggml-prune POST_BUILD VERBATIM COMMAND_EXPAND_LISTS
+        COMMENT "nvprune -v $<TARGET_FILE:ggml> -o $<TARGET_FILE:ggml>.tmp ${NVPRUNE_ARCH}"
+        COMMAND ${CUDAToolkit_BIN_DIR}/nvprune -v "$<TARGET_FILE:ggml>" -o "$<TARGET_FILE:ggml>.tmp" "${NVPRUNE_ARCH}"
         COMMAND ${CMAKE_COMMAND} -E remove "$<TARGET_FILE:ggml>"
         COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:ggml>.tmp" "$<TARGET_FILE:ggml>"
         COMMAND ${CMAKE_COMMAND} -E remove "$<TARGET_FILE:ggml>.tmp"
