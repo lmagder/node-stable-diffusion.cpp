@@ -9,6 +9,10 @@ set(CMAKE_POLICY_DEFAULT_CMP0091 NEW)
 #required for linux, harmless elsehwer
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wno-expansion-to-defined)
+endif()
+
 include(FetchContent)
 
 find_package(CUDAToolkit)
