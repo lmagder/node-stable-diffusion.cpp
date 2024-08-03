@@ -18,7 +18,7 @@
     "rebuild": "tsc --build --clean && cmake-js rebuild -p 8"
   },
   "bin": {
-    "node-sd": "build/cli.js"
+    "node-sd": "./bin/node-sd"
   },
   "binary": {
     "napi_versions": [
@@ -38,7 +38,8 @@
     "./index.js",
     "./binding-options.cjs",
     "./build/*.js",
-    "./prebuilds"
+    "./prebuilds",
+    "./bin"
   ],
   "dependencies": {
     "cmake-js": "7.3.0",
