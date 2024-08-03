@@ -67,7 +67,6 @@ jobs:
         with:
           name: node-addon-binary-*
       - run: npm ci
-      - run: npm run tsbuild
       - run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
