@@ -77,6 +77,8 @@ if (fs.existsSync(versionListPath)) {
         if (d.path.toLowerCase().includes(fileExt) && !d.path.toLowerCase().includes("/stubs/")) {
           const dest = path.join(resolvedPath, path.basename(d.path));
           console.info(`Writing ${dest}`);
+          if (fs.existsSync(dest)) fs.unlinkSync(dest);
+
           if (d.type === "file") {
             fs.writeFileSync(dest, d.data, { encoding: "binary", mode: d.mode });
           } else if (d.type === "symlink" && d.linkname) {
