@@ -13,7 +13,7 @@
   },
   "homepage": "https://github.com/lmagder/node-stable-diffusion.cpp",
   "scripts": {
-    "postinstall": "(pkg-prebuilds-verify ./binding-options.cjs || cmake-js compile -p 8) && (path-exists node_modules/typescript || tsc) && node build/cudadeps.js",
+    "postinstall": "(pkg-prebuilds-verify ./binding-options.cjs || cmake-js compile -p 8) && (path-exists node_modules/typescript && tsc) && node build/cudadeps.js",
     "prepare": "tsc --build",
     "rebuild": "tsc --build --clean && cmake-js rebuild -p 8"
   },
