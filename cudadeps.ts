@@ -9,6 +9,7 @@ import { Stream } from "node:stream";
 import { buffer } from "node:stream/consumers";
 import decompress from "decompress";
 import { ReadableStream } from "node:stream/web";
+import { hasher } from "node-object-hash";
 
 const require = createRequire(import.meta.url);
 const decompressTar = require("decompress-tar");
@@ -55,10 +56,11 @@ const resolvedPath = path.dirname((loadBinding as any).resolve(process.cwd(), op
 
 const versionListPath = path.join(resolvedPath, versionListFile);
 if (fs.existsSync(versionListPath)) {
+  const versionList = JSON.parse(fs.readFileSync(versionListPath, { encoding: "utf8" }));
+  const versionListHash = hasher({ sort: true }).hash(versionList) + "_" + cudaSubfolder;
   const downloadMarkerPath = path.join(resolvedPath, downloadMarkerFile);
-  if (!fs.existsSync(downloadMarkerPath)) {
+  if (!fs.existsSync(downloadMarkerPath) || fs.readFileSync(downloadMarkerPath).toString() !== versionListHash) {
     console.info(`Downloading components ${components} for ${arch} - ${platform}`);
-    const versionList = JSON.parse(fs.readFileSync(versionListPath, { encoding: "utf8" }));
     for (const componentId of components) {
       const componentVersion = versionList[componentId].version;
       const archivePath = `${repoUrl}/${componentId}/${cudaSubfolder}/${componentId}-${cudaSubfolder}-${componentVersion}-archive.${archiveExt}`;
@@ -69,8 +71,8 @@ if (fs.existsSync(versionListPath)) {
       console.info(`Done.`);
       console.info(`Extracting...`);
 
-      const archiveFiles = await decompress(data, { plugins: [decompressTarXz(), decompressUnzip()] }) as (decompress.File & { linkname?: string })[];
-      archiveFiles.sort((x,y) => x.type.localeCompare(y.type));
+      const archiveFiles = (await decompress(data, { plugins: [decompressTarXz(), decompressUnzip()] })) as (decompress.File & { linkname?: string })[];
+      archiveFiles.sort((x, y) => x.type.localeCompare(y.type));
       for (const d of archiveFiles) {
         if (d.path.toLowerCase().includes(fileExt) && !d.path.toLowerCase().includes("/stubs/")) {
           const dest = path.join(resolvedPath, path.basename(d.path));
@@ -86,7 +88,7 @@ if (fs.existsSync(versionListPath)) {
       }
     }
 
-    fs.writeFileSync(downloadMarkerPath, "done");
+    fs.writeFileSync(downloadMarkerPath, versionListHash);
     console.info(`Done`);
   }
 }
