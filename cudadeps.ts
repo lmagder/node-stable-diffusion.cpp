@@ -55,7 +55,7 @@ const options = require(path.join(process.cwd(), bindingOptionsFile));
 const resolvedPath = path.dirname((loadBinding as any).resolve(process.cwd(), options, false, true) as string);
 
 const versionListPath = path.join(resolvedPath, versionListFile);
-if (fs.existsSync(versionListPath)) {
+if (fs.existsSync(versionListPath) && process.env.npm_command !== "ci") {
   const versionList = JSON.parse(fs.readFileSync(versionListPath, { encoding: "utf8" }));
   const versionListHash = hasher({ sort: true }).hash(versionList) + "_" + cudaSubfolder;
   const downloadMarkerPath = path.join(resolvedPath, downloadMarkerFile);
