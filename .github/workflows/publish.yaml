@@ -40,7 +40,7 @@ jobs:
           node-version: "20.x"
           registry-url: "https://registry.npmjs.org"
       - run: npm ci
-      - run: npx pkg-prebuilds-copy --baseDir build/Release --source node-stable-diffusion-cpp.node --name=node-stable-diffusion-cpp --strip  --napi_version=9 --arch=x64 ${{ contains(matrix.os, 'windows') && '--extraFiles=cublas64_12.dll --extraFiles=cublasLt64_12.dll' || '' }}
+      - run: npx pkg-prebuilds-copy --baseDir build/Release --source node-stable-diffusion-cpp.node --name=node-stable-diffusion-cpp --strip  --napi_version=9 --arch=x64 --extraFiles=cuda_version.json
       - uses: actions/upload-artifact@v4
         with:
           name: node-addon-binary-${{ matrix.os }}
