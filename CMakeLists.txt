@@ -28,8 +28,6 @@ FetchContent_Declare(
   GIT_TAG        83e80d5171f02b0f806794e0b0329828f87702f9 # fix-untyped-tensors
 )
 
-set(GGML_STATIC ON)
-
 if (CUDAToolkit_FOUND)
   set(SD_CUBLAS ON)
   set(SD_FLASH_ATTN ON)
@@ -51,45 +49,26 @@ FetchContent_MakeAvailable(stable-diffusion-cpp)
 
 project(node-stable-diffusion-cpp)
 
-if (SD_CUBLAS AND 0)
-    set(NVPRUNE_ARCH_LIST $<LIST:TRANSFORM,$<TARGET_PROPERTY:ggml,CUDA_ARCHITECTURES>,PREPEND,code=sm_> $<LIST:TRANSFORM,$<TARGET_PROPERTY:ggml,CUDA_ARCHITECTURES>,PREPEND,code=compute_>)
-    set(NVPRUNE_ARCH -gencode $<JOIN:${NVPRUNE_ARCH_LIST},\ -gencode\ >)
-    add_custom_target(ggml-prune)
-    add_custom_command(TARGET ggml-prune POST_BUILD VERBATIM COMMAND_EXPAND_LISTS
-        COMMENT "nvprune -v $<TARGET_FILE:ggml> -o $<TARGET_FILE:ggml>.tmp ${NVPRUNE_ARCH}"
-        COMMAND ${CUDAToolkit_BIN_DIR}/nvprune -v "$<TARGET_FILE:ggml>" -o "$<TARGET_FILE:ggml>.tmp" "${NVPRUNE_ARCH}"
-        COMMAND ${CMAKE_COMMAND} -E remove "$<TARGET_FILE:ggml>"
-        COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:ggml>.tmp" "$<TARGET_FILE:ggml>"
-        COMMAND ${CMAKE_COMMAND} -E remove "$<TARGET_FILE:ggml>.tmp"
-    )
-    add_dependencies(ggml-prune ggml)
-    add_dependencies(stable-diffusion ggml-prune)
-endif()
-
 file(GLOB SOURCE_FILES CONFIGURE_DEPENDS "src/*.cpp" "src/*.h")
-add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
+add_library(node-stable-diffusion-cpp SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
 
-set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" SUFFIX ".node")
-set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 20)
+set_target_properties(node-stable-diffusion-cpp PROPERTIES PREFIX "" SUFFIX ".node")
+set_target_properties(node-stable-diffusion-cpp PROPERTIES CXX_STANDARD 20)
 
-target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE ${CMAKE_JS_INC})
-target_compile_definitions(${PROJECT_NAME} PRIVATE NAPI_VERSION=9 NODE_ADDON_API_DISABLE_DEPRECATED)
+target_include_directories(node-stable-diffusion-cpp SYSTEM PRIVATE ${CMAKE_JS_INC})
+target_compile_definitions(node-stable-diffusion-cpp PRIVATE NAPI_VERSION=9 NODE_ADDON_API_DISABLE_DEPRECATED)
 
-target_link_libraries(${PROJECT_NAME} ${CMAKE_JS_LIB} stable-diffusion)
+target_link_libraries(node-stable-diffusion-cpp ${CMAKE_JS_LIB} stable-diffusion)
+
+if (CUDAToolkit_FOUND)
+  file(GENERATE OUTPUT $<TARGET_FILE_DIR:node-stable-diffusion-cpp>/cuda_version.json INPUT ${CUDAToolkit_LIBRARY_ROOT}/version.json)
+else()
+  file(GENERATE OUTPUT $<TARGET_FILE_DIR:node-stable-diffusion-cpp>/cuda_version.json CONTENT "{}")
+endif()
 
 if(MSVC AND CMAKE_JS_NODELIB_DEF AND CMAKE_JS_NODELIB_TARGET)
   # Generate node.lib
   execute_process(COMMAND ${CMAKE_AR} /def:${CMAKE_JS_NODELIB_DEF} /out:${CMAKE_JS_NODELIB_TARGET} ${CMAKE_STATIC_LINKER_FLAGS})
-
-  #copy cublas DLLs
-  if (SD_CUBLAS)
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy ${CUDAToolkit_TARGET_DIR}/bin/cublas64_${CUDAToolkit_VERSION_MAJOR}.dll $<TARGET_FILE_DIR:${PROJECT_NAME}>
-      COMMAND_EXPAND_LISTS
-    )
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy ${CUDAToolkit_TARGET_DIR}/bin/cublasLt64_${CUDAToolkit_VERSION_MAJOR}.dll $<TARGET_FILE_DIR:${PROJECT_NAME}>
-      COMMAND_EXPAND_LISTS
-    )
-  endif()
 endif()
+
+
