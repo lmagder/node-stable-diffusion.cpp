@@ -59,19 +59,24 @@ if (fs.existsSync(versionListPath) && process.env.npm_command !== "ci") {
   const versionList = JSON.parse(fs.readFileSync(versionListPath, { encoding: "utf8" }));
   const versionListHash = hasher({ sort: true }).hash(versionList) + "_" + cudaSubfolder;
   const downloadMarkerPath = path.join(resolvedPath, downloadMarkerFile);
+
   if (!fs.existsSync(downloadMarkerPath) || fs.readFileSync(downloadMarkerPath).toString() !== versionListHash) {
     console.info(`Downloading components ${components} for ${arch} - ${platform}`);
+
     for (const componentId of components) {
       const componentVersion = versionList[componentId].version;
       const archivePath = `${repoUrl}/${componentId}/${cudaSubfolder}/${componentId}-${cudaSubfolder}-${componentVersion}-archive.${archiveExt}`;
+
       console.info(`Downloading ${archivePath}...`);
       const file = await fetch(archivePath);
       if (!file.body || !file.ok) throw new Error(`Downloading ${archivePath} failed`);
       const data = await buffer(file.body);
       console.info(`Done.`);
-      console.info(`Extracting...`);
 
+      console.info(`Extracting...`);
       const archiveFiles = (await decompress(data, { plugins: [decompressTarXz(), decompressUnzip()] })) as (decompress.File & { linkname?: string })[];
+      console.info(`Done`);
+
       archiveFiles.sort((x, y) => x.type.localeCompare(y.type));
       for (const d of archiveFiles) {
         if (d.path.toLowerCase().includes(fileExt) && !d.path.toLowerCase().includes("/stubs/")) {
@@ -91,6 +96,5 @@ if (fs.existsSync(versionListPath) && process.env.npm_command !== "ci") {
     }
 
     fs.writeFileSync(downloadMarkerPath, versionListHash);
-    console.info(`Done`);
   }
 }
