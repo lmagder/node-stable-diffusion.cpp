@@ -3,12 +3,12 @@ import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
 import loadBinding from "pkg-prebuilds";
-import { isStream } from "is-stream";
-import { fileTypeFromStream } from "file-type";
+import { fileTypeFromBuffer, fileTypeFromStream } from "file-type";
 import xz from "xz-decompress";
 import { Stream } from "node:stream";
 import { buffer } from "node:stream/consumers";
 import decompress from "decompress";
+import { ReadableStream } from "node:stream/web";
 
 const require = createRequire(import.meta.url);
 const decompressTar = require("decompress-tar");
@@ -33,23 +33,14 @@ const nodeToCudaPlatform = {
 } as Record<string, string>;
 
 const decompressTarXz = () => async (input: Buffer | NodeJS.ReadableStream) => {
-  let inStream: NodeJS.ReadableStream | undefined;
-  if (Buffer.isBuffer(input)) {
-    const wrapper = new Stream.PassThrough();
-    wrapper.end(input);
-    inStream = wrapper;
-  } else if (isStream(input)) {
-    inStream = input;
-  } else {
-    throw new TypeError(`Expected a Buffer or Stream, got ${typeof input}`);
-  }
-
-  const type = await fileTypeFromStream(inStream);
+  const type = Buffer.isBuffer(input) ? await fileTypeFromBuffer(input) : await fileTypeFromStream(input);
   if (!type || type.ext !== "xz") {
     return [];
   }
-
-  return decompressTar()(new xz.XzReadableStream(inStream));
+  const tar = decompressTar();
+  const inStream = Stream.Readable.toWeb(Buffer.isBuffer(input) ? new Stream.PassThrough().end(input) : Stream.Readable.from(input));
+  const xzStream = new xz.XzReadableStream(inStream);
+  return tar(Stream.Readable.fromWeb(xzStream as ReadableStream));
 };
 
 const arch = nodeToCudaArch[process.env.npm_config_arch || os.arch()];
@@ -78,12 +69,19 @@ if (fs.existsSync(versionListPath)) {
       console.info(`Done.`);
       console.info(`Extracting...`);
 
-      const archiveFiles = await decompress(data, { plugins: [decompressTarXz(), decompressUnzip()] });
+      const archiveFiles = await decompress(data, { plugins: [decompressTarXz(), decompressUnzip()] }) as (decompress.File & { linkname?: string })[];
+      archiveFiles.sort((x,y) => x.type.localeCompare(y.type));
       for (const d of archiveFiles) {
-        if (d.type === "file" && path.extname(d.path).toLowerCase() === fileExt) {
+        if (d.path.toLowerCase().includes(fileExt) && !d.path.toLowerCase().includes("/stubs/")) {
           const dest = path.join(resolvedPath, path.basename(d.path));
           console.info(`Writing ${dest}`);
-          fs.writeFileSync(dest, d.data, { encoding: "binary", mode: d.mode });
+          if (d.type === "file") {
+            fs.writeFileSync(dest, d.data, { encoding: "binary", mode: d.mode });
+          } else if (d.type === "symlink" && d.linkname) {
+            fs.symlinkSync(d.linkname, dest);
+          } else if (d.type === "link" && d.linkname) {
+            fs.linkSync(d.linkname, dest);
+          }
         }
       }
     }
