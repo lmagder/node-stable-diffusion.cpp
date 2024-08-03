@@ -13,8 +13,8 @@
   },
   "homepage": "https://github.com/lmagder/node-stable-diffusion.cpp",
   "scripts": {
-    "install": "(pkg-prebuilds-verify ./binding-options.cjs || cmake-js compile -p 8) && node build/cudadeps.js",
-    "tsbuild": "tsc --build",
+    "postinstall": "(pkg-prebuilds-verify ./binding-options.cjs || cmake-js compile -p 8) && (path-exists build/cudadeps.js || tsc) && node build/cudadeps.js",
+    "prepare": "tsc --build",
     "rebuild": "tsc --build --clean && cmake-js rebuild -p 8"
   },
   "bin": {
@@ -48,6 +48,7 @@
     "file-type": "19.3.0",
     "is-stream": "4.0.1",
     "node-addon-api": "8.0.0",
+    "path-exists-cli": "2.0.0",
     "pkg-prebuilds": "1.0.0",
     "sharp": "0.33.4",
     "xz-decompress": "0.2.2"
