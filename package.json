@@ -18,7 +18,7 @@
     "rebuild": "tsc --build --clean && cmake-js rebuild -p 8"
   },
   "bin": {
-    "node-sd": "./bin/node-sd"
+    "node-sd": "bin/node-sd"
   },
   "binary": {
     "napi_versions": [
