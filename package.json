@@ -1,6 +1,6 @@
 {
   "name": "@lmagder/node-stable-diffusion-cpp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Lucas Magder (https://github.com/lmagder)",
   "description": "Node bindings for https://github.com/leejet/stable-diffusion.cpp",
   "license": "MIT",
@@ -13,7 +13,7 @@
   },
   "homepage": "https://github.com/lmagder/node-stable-diffusion.cpp",
   "scripts": {
-    "postinstall": "(pkg-prebuilds-verify ./binding-options.cjs || cmake-js compile -p 8) && (path-exists node_modules/typescript && tsc) && node build/cudadeps.js",
+    "postinstall": "(pkg-prebuilds-verify ./binding-options.cjs || cmake-js compile -p 8) && ((path-exists ./node_modules/typescript && tsc) || path-exists ./build/cudadeps.js) && node ./build/cudadeps.js",
     "prepare": "tsc --build",
     "rebuild": "tsc --build --clean && cmake-js rebuild -p 8"
   },
@@ -39,7 +39,9 @@
     "./binding-options.cjs",
     "./build/*.js",
     "./prebuilds",
-    "./bin"
+    "./bin",
+    "./CMakeLists.txt",
+    "./src"
   ],
   "dependencies": {
     "cmake-js": "7.3.0",
