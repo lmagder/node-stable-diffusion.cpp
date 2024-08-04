@@ -3,6 +3,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish to NPM"
+        required: false
+        type: boolean
 jobs:
   build:
     strategy:
@@ -71,6 +76,7 @@ jobs:
           name: node-addon-binary-*
       - run: npm ci
       - run: npm publish --provenance --access public
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - run: npm pack
