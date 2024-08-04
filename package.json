@@ -15,6 +15,7 @@
   "scripts": {
     "postinstall": "(pkg-prebuilds-verify ./binding-options.cjs || cmake-js compile -p 8) && ((path-exists ./node_modules/typescript && tsc) || path-exists ./build/cudadeps.js) && node ./build/cudadeps.js",
     "prepare": "tsc --build",
+    "pkg-prebuilds-copy": "pkg-prebuilds-copy --baseDir build/Release --source node-stable-diffusion-cpp.node --name=node-stable-diffusion-cpp --strip  --napi_version=9 --extraFiles=cuda_version.json",
     "rebuild": "tsc --build --clean && cmake-js rebuild -p 8"
   },
   "bin": {
