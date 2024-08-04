@@ -81,6 +81,11 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - run: npm pack
       - uses: actions/upload-artifact@v4
+        if: github.event_name != 'release'
         with:
           name: lmagder-node-stable-diffusion-cpp
           path: lmagder-node-stable-diffusion-cpp-*.tgz
+      - run: gh release upload ${{github.event.release.tag_name}} lmagder-node-stable-diffusion-cpp-*.tgz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: github.event_name == 'release'
