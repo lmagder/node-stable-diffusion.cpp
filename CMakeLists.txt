@@ -9,10 +9,6 @@ set(CMAKE_POLICY_DEFAULT_CMP0091 NEW)
 #required for linux, harmless elsehwer
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wno-expansion-to-defined)
-endif()
-
 include(FetchContent)
 
 find_package(CUDAToolkit)
@@ -42,21 +38,25 @@ if (CUDAToolkit_FOUND)
   if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     set(CMAKE_CUDA_ARCHITECTURES "75;86;89")
   endif()
-  if (CMAKE_SYSTEM_NAME MATCHES "Linux")
+  if (NOT WIN32)
+
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler \"-Wno-expansion-to-defined\"")
 
     FetchContent_MakeAvailable(implib-so)
     FetchContent_GetProperties(implib-so SOURCE_DIR IMPLIB_SO_FOLDER)
 
+    message(STATUS "Extracted implib-gen to ${IMPLIB_SO_FOLDER}")
+
     get_target_property(LIBCUDAPATH CUDA::cuda_driver IMPORTED_LOCATION)
     if (${LIBCUDAPATH} STREQUAL "LIBCUDAPATH-NOTFOUND")
-      set(LIBCUDASTUB ${CMAKE_SYSROOT}/usr/local/cuda-${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR}/targets/x86_64-linux/lib/stubs/libcuda.so)
-      if (EXISTS ${LIBCUDASTUB})
+      set(LIBCUDAPATH ${CMAKE_SYSROOT}/usr/local/cuda-${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR}/targets/x86_64-linux/lib/stubs/libcuda.so)
+      if (EXISTS ${LIBCUDAPATH})
         message(STATUS "Can't find libcuda.so but have a valid toolkit. Asssuming we are using the stub")
-        set_target_properties(CUDA::cuda_driver PROPERTIES IMPORTED_LOCATION ${LIBCUDASTUB})
+        set_target_properties(CUDA::cuda_driver PROPERTIES IMPORTED_LOCATION ${LIBCUDAPATH})
       endif()
     endif()
 
-    set(IMPLIB_SOURCE_FILES ${CMAKE_CURRENT_BINARY_DIR}/libnvcuda.so.tramp.S ${CMAKE_CURRENT_BINARY_DIR}/libnvcuda.so.init.c)
+    set(IMPLIB_SOURCE_FILES ${CMAKE_CURRENT_BINARY_DIR}/libcuda.so.tramp.S ${CMAKE_CURRENT_BINARY_DIR}/libcuda.so.init.c)
 
     add_custom_command(
       OUTPUT ${IMPLIB_SOURCE_FILES}
@@ -69,6 +69,10 @@ endif()
 FetchContent_MakeAvailable(stable-diffusion-cpp)
 
 project(node-stable-diffusion-cpp)
+
+if (NOT WIN32)
+  add_compile_options(-Wno-expansion-to-defined)
+endif()
 
 enable_language(ASM)
 
