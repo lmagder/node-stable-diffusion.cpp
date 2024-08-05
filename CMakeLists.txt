@@ -28,6 +28,13 @@ FetchContent_Declare(
   GIT_TAG        83e80d5171f02b0f806794e0b0329828f87702f9 # fix-untyped-tensors
 )
 
+FetchContent_Declare(
+  implib-so
+  GIT_REPOSITORY https://github.com/yugr/Implib.so.git
+  GIT_TAG        f9ff166845a59327eda431af82ee85a9c7532c5d
+)
+
+set(IMPLIB_SOURCE_FILES "")
 if (CUDAToolkit_FOUND)
   set(SD_CUBLAS ON)
   set(SD_FLASH_ATTN ON)
@@ -35,13 +42,27 @@ if (CUDAToolkit_FOUND)
   if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
     set(CMAKE_CUDA_ARCHITECTURES "75;86;89")
   endif()
-  get_target_property(LIBCUDAPATH CUDA::cuda_driver IMPORTED_LOCATION)
-  if (${LIBCUDAPATH} STREQUAL "LIBCUDAPATH-NOTFOUND")
-    set(LIBCUDASTUB ${CMAKE_SYSROOT}/usr/local/cuda-${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR}/targets/x86_64-linux/lib/stubs/libcuda.so)
-    if (EXISTS ${LIBCUDASTUB})
-      message(STATUS "Can't find libcuda.so but have a valid toolkit. Asssuming we are using the stub")
-      set_target_properties(CUDA::cuda_driver PROPERTIES IMPORTED_LOCATION ${LIBCUDASTUB})
+  if (CMAKE_SYSTEM_NAME MATCHES "Linux")
+
+    FetchContent_MakeAvailable(implib-so)
+    FetchContent_GetProperties(implib-so SOURCE_DIR IMPLIB_SO_FOLDER)
+
+    get_target_property(LIBCUDAPATH CUDA::cuda_driver IMPORTED_LOCATION)
+    if (${LIBCUDAPATH} STREQUAL "LIBCUDAPATH-NOTFOUND")
+      set(LIBCUDASTUB ${CMAKE_SYSROOT}/usr/local/cuda-${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR}/targets/x86_64-linux/lib/stubs/libcuda.so)
+      if (EXISTS ${LIBCUDASTUB})
+        message(STATUS "Can't find libcuda.so but have a valid toolkit. Asssuming we are using the stub")
+        set_target_properties(CUDA::cuda_driver PROPERTIES IMPORTED_LOCATION ${LIBCUDASTUB})
+      endif()
     endif()
+
+    set(IMPLIB_SOURCE_FILES ${CMAKE_CURRENT_BINARY_DIR}/libnvcuda.so.tramp.S ${CMAKE_CURRENT_BINARY_DIR}/libnvcuda.so.init.c)
+
+    add_custom_command(
+      OUTPUT ${IMPLIB_SOURCE_FILES}
+      COMMAND ${IMPLIB_SO_FOLDER}/implib-gen.py -q ${LIBCUDAPATH}
+      DEPENDS ${LIBCUDAPATH}
+    )
   endif()
 endif()
 
@@ -49,8 +70,10 @@ FetchContent_MakeAvailable(stable-diffusion-cpp)
 
 project(node-stable-diffusion-cpp)
 
+enable_language(ASM)
+
 file(GLOB SOURCE_FILES CONFIGURE_DEPENDS "src/*.cpp" "src/*.h")
-add_library(node-stable-diffusion-cpp SHARED ${SOURCE_FILES} ${CMAKE_JS_SRC})
+add_library(node-stable-diffusion-cpp SHARED ${SOURCE_FILES} ${IMPLIB_SOURCE_FILES} ${CMAKE_JS_SRC})
 
 set_target_properties(node-stable-diffusion-cpp PROPERTIES PREFIX "" SUFFIX ".node")
 set_target_properties(node-stable-diffusion-cpp PROPERTIES CXX_STANDARD 20)
@@ -69,6 +92,7 @@ endif()
 if(MSVC AND CMAKE_JS_NODELIB_DEF AND CMAKE_JS_NODELIB_TARGET)
   # Generate node.lib
   execute_process(COMMAND ${CMAKE_AR} /def:${CMAKE_JS_NODELIB_DEF} /out:${CMAKE_JS_NODELIB_TARGET} ${CMAKE_STATIC_LINKER_FLAGS})
+  target_link_options(node-stable-diffusion-cpp PRIVATE "/DELAYLOAD:nvcuda.dll")
 endif()
 
 
