@@ -47,6 +47,9 @@ declare module "@lmagder/node-stable-diffusion-cpp" {
     F64,
     IQ1_M,
     BF16,
+    Q4_0_4_4,
+    Q4_0_4_8,
+    Q4_0_8_8,
   }
 
   export type Image = Readonly<{

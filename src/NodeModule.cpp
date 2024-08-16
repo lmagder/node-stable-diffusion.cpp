@@ -313,6 +313,9 @@ namespace
                 Napi::PropertyDescriptor::Value("F64", Napi::Number::New(env, SD_TYPE_F64)),
                 Napi::PropertyDescriptor::Value("IQ1_M", Napi::Number::New(env, SD_TYPE_IQ1_M)),
                 Napi::PropertyDescriptor::Value("BF16", Napi::Number::New(env, SD_TYPE_BF16)),
+                Napi::PropertyDescriptor::Value("Q4_0_4_4", Napi::Number::New(env, SD_TYPE_Q4_0_4_4)),
+                Napi::PropertyDescriptor::Value("Q4_0_4_8", Napi::Number::New(env, SD_TYPE_Q4_0_4_8)),
+                Napi::PropertyDescriptor::Value("Q4_0_8_8", Napi::Number::New(env, SD_TYPE_Q4_0_8_8)),
             });
             typeEnum.Freeze();
 
