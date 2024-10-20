@@ -336,7 +336,10 @@ namespace
         {
             Napi::Value tmp;
             const auto params = info[0].ToObject();
-            const auto model = params.Get("model").ToString().Utf8Value();
+            const auto model = (tmp = params.Get("model"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value()); 
+            const auto clipL = (tmp = params.Get("clipL"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value());
+            const auto t5xxl = (tmp = params.Get("t5xxl"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value());
+            const auto diffusionModel = (tmp = params.Get("diffusionModel"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value()); 
             const auto vae = (tmp = params.Get("vae"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value());
             const auto taesd = (tmp = params.Get("taesd"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value());
             const auto controlNet = (tmp = params.Get("controlNet"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value());
@@ -375,9 +378,33 @@ namespace
 
             return queueStableDiffusionWorker(info.Env(), cppContextData, [=](CPPContextData& ctx)
             {
-                ctx.sdCtx = { new_sd_ctx(model.c_str(), vae.c_str(), taesd.c_str(), controlNet.c_str(), loraDir.c_str(),
-                    embedDir.c_str(), stackedIdEmbedDir.c_str(), vaeDecodeOnly, vaeTiling, freeParamsImmediately, numThreads, weightType,
-                    cudaRng ? CUDA_RNG : STD_DEFAULT_RNG, schedule, keepClipOnCpu, keepControlNetOnCpu, keepVaeOnCpu), [](sd_ctx_t* c) { if (c) free_sd_ctx(c); } };
+                ctx.sdCtx = { 
+                    new_sd_ctx(
+                        model.c_str(),
+                        clipL.c_str(),
+                        t5xxl.c_str(),
+                        diffusionModel.c_str(),
+                        vae.c_str(),
+                        taesd.c_str(),
+                        controlNet.c_str(),
+                        loraDir.c_str(),
+                        embedDir.c_str(),
+                        stackedIdEmbedDir.c_str(),
+                        vaeDecodeOnly,
+                        vaeTiling,
+                        freeParamsImmediately,
+                        numThreads,
+                        weightType,
+                        cudaRng ? CUDA_RNG : STD_DEFAULT_RNG,
+                        schedule,
+                        keepClipOnCpu,
+                        keepControlNetOnCpu,
+                        keepVaeOnCpu
+                    ), 
+                    [](sd_ctx_t* c) { 
+                        if (c) free_sd_ctx(c); 
+                    } 
+                };
 
                 if (!ctx.sdCtx)
                     throw std::runtime_error("Context creation failed");
@@ -427,12 +454,32 @@ namespace
                         const auto styleRatio = (tmp = params.Get("styleRatio"), tmp.IsUndefined() ? 20.0f : tmp.ToNumber().FloatValue());
                         const auto normalizeInput = (tmp = params.Get("normalizeInput"), tmp.IsUndefined() ? false : tmp.ToBoolean().Value());
                         const auto inputIdImagesPath = (tmp = params.Get("inputIdImagesPath"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value());
+                        const auto guidance = (tmp = params.Get("guidance"), tmp.IsUndefined() ? 0.0f : tmp.ToNumber().FloatValue());
+                        
                         if (sampleMethod >= N_SAMPLE_METHODS)
                             throw Napi::Error::New(info.Env(), "Invalid sampleMethod");
 
                         return queueStableDiffusionWorker(info.Env(), cppContextData, [=, sdCtx = cppContextData->sdCtx, controlCond = std::move(controlCond)](CPPContextData& ctx)
                         {
-                            return SdImageList(txt2img(sdCtx.get(), prompt.c_str(), negativePrompt.c_str(), clipSkip, cfgScale, width, height, sampleMethod, sampleSteps, seed, batchCount, controlCond.get(), controlStrength, styleRatio, normalizeInput, inputIdImagesPath.c_str()), batchCount);
+                            return SdImageList(txt2img(
+                                sdCtx.get(),
+                                prompt.c_str(),
+                                negativePrompt.c_str(),
+                                clipSkip,
+                                cfgScale,
+                                guidance,
+                                width,
+                                height,
+                                sampleMethod,
+                                sampleSteps,
+                                seed,
+                                batchCount,
+                                controlCond.get(),
+                                controlStrength,
+                                styleRatio,
+                                normalizeInput,
+                                inputIdImagesPath.c_str()
+                            ), batchCount);
                         },
                         [batchCount](Napi::Env env, SdImageList&& images)
                         {
@@ -468,12 +515,33 @@ namespace
                         const auto styleRatio = (tmp = params.Get("styleRatio"), tmp.IsUndefined() ? 20.0f : tmp.ToNumber().FloatValue());
                         const auto normalizeInput = (tmp = params.Get("normalizeInput"), tmp.IsUndefined() ? false : tmp.ToBoolean().Value());
                         const auto inputIdImagesPath = (tmp = params.Get("inputIdImagesPath"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value());
+                        const auto guidance = (tmp = params.Get("guidance"), tmp.IsUndefined() ? 0.0f : tmp.ToNumber().FloatValue());
                         if (sampleMethod >= N_SAMPLE_METHODS)
                             throw Napi::Error::New(info.Env(), "Invalid sampleMethod");
 
                         return queueStableDiffusionWorker(info.Env(), cppContextData, [=, sdCtx = cppContextData->sdCtx, initImage = std::move(initImage), controlCond = std::move(controlCond)](CPPContextData& ctx)
                         {
-                            return SdImageList(img2img(sdCtx.get(), *initImage, prompt.c_str(), negativePrompt.c_str(), clipSkip, cfgScale, width, height, sampleMethod, sampleSteps, strength, seed, batchCount, controlCond.get(), controlStrength, styleRatio, normalizeInput, inputIdImagesPath.c_str()), batchCount);
+                            return SdImageList(img2img(
+                                sdCtx.get(),
+                                *initImage,
+                                prompt.c_str(),
+                                negativePrompt.c_str(),
+                                clipSkip,
+                                cfgScale,
+                                guidance,
+                                width,
+                                height,
+                                sampleMethod,
+                                sampleSteps,
+                                strength,
+                                seed,
+                                batchCount,
+                                controlCond.get(),
+                                controlStrength,
+                                styleRatio,
+                                normalizeInput,
+                                inputIdImagesPath.c_str()
+                            ), batchCount);
                         },
                         [batchCount](Napi::Env env, SdImageList&& images)
                         {

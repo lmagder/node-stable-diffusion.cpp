@@ -21,7 +21,7 @@ endif()
 FetchContent_Declare(
   stable-diffusion-cpp
   GIT_REPOSITORY https://github.com/lmagder/stable-diffusion.cpp.git
-  GIT_TAG        f974370e049da45866d70f45673c5453e089251b # fix-untyped-tensors
+  GIT_TAG        14206fd48832ab600d9db75f15acb5062ae2c296 # fix clip tokenizer
 )
 
 FetchContent_Declare(
