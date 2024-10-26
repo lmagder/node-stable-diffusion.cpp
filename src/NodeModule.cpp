@@ -248,7 +248,7 @@ namespace
 
         return ret;
     }
-   
+
     class NodeStableDiffusionCpp : public Napi::Addon<NodeStableDiffusionCpp>
     {
     public:
@@ -277,6 +277,7 @@ namespace
                 Napi::PropertyDescriptor::Value("Default", Napi::Number::New(env, DEFAULT)),
                 Napi::PropertyDescriptor::Value("Discrete", Napi::Number::New(env, DISCRETE)),
                 Napi::PropertyDescriptor::Value("Karras", Napi::Number::New(env, KARRAS)),
+                Napi::PropertyDescriptor::Value("GITS", Napi::Number::New(env, GITS)),
                 Napi::PropertyDescriptor::Value("AYS", Napi::Number::New(env, AYS)),
             });
             scheduleEnum.Freeze();
@@ -336,10 +337,11 @@ namespace
         {
             Napi::Value tmp;
             const auto params = info[0].ToObject();
-            const auto model = (tmp = params.Get("model"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value()); 
+            const auto model = (tmp = params.Get("model"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value());
             const auto clipL = (tmp = params.Get("clipL"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value());
+            const auto clipG = (tmp = params.Get("clipG"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value());
             const auto t5xxl = (tmp = params.Get("t5xxl"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value());
-            const auto diffusionModel = (tmp = params.Get("diffusionModel"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value()); 
+            const auto diffusionModel = (tmp = params.Get("diffusionModel"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value());
             const auto vae = (tmp = params.Get("vae"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value());
             const auto taesd = (tmp = params.Get("taesd"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value());
             const auto controlNet = (tmp = params.Get("controlNet"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value());
@@ -378,10 +380,11 @@ namespace
 
             return queueStableDiffusionWorker(info.Env(), cppContextData, [=](CPPContextData& ctx)
             {
-                ctx.sdCtx = { 
+                ctx.sdCtx = {
                     new_sd_ctx(
                         model.c_str(),
                         clipL.c_str(),
+                        clipG.c_str(),
                         t5xxl.c_str(),
                         diffusionModel.c_str(),
                         vae.c_str(),
@@ -400,10 +403,10 @@ namespace
                         keepClipOnCpu,
                         keepControlNetOnCpu,
                         keepVaeOnCpu
-                    ), 
-                    [](sd_ctx_t* c) { 
-                        if (c) free_sd_ctx(c); 
-                    } 
+                    ),
+                    [](sd_ctx_t* c) {
+                        if (c) free_sd_ctx(c);
+                    }
                 };
 
                 if (!ctx.sdCtx)
@@ -455,7 +458,7 @@ namespace
                         const auto normalizeInput = (tmp = params.Get("normalizeInput"), tmp.IsUndefined() ? false : tmp.ToBoolean().Value());
                         const auto inputIdImagesPath = (tmp = params.Get("inputIdImagesPath"), tmp.IsUndefined() ? "" : tmp.ToString().Utf8Value());
                         const auto guidance = (tmp = params.Get("guidance"), tmp.IsUndefined() ? 0.0f : tmp.ToNumber().FloatValue());
-                        
+
                         if (sampleMethod >= N_SAMPLE_METHODS)
                             throw Napi::Error::New(info.Env(), "Invalid sampleMethod");
 

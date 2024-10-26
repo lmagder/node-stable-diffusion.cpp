@@ -17,6 +17,7 @@ declare module "@lmagder/node-stable-diffusion-cpp" {
     Discrete,
     Karras,
     AYS,
+    GITS,
   }
 
   declare enum Type {
@@ -122,6 +123,7 @@ declare module "@lmagder/node-stable-diffusion-cpp" {
     params: {
       model?: string;
       clipL?: string;
+      clipG?: string;
       t5xxl?: string;
       diffusionModel?: string;
       vae?: string;

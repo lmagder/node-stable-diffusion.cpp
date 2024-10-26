@@ -20,8 +20,8 @@ endif()
 
 FetchContent_Declare(
   stable-diffusion-cpp
-  GIT_REPOSITORY https://github.com/lmagder/stable-diffusion.cpp.git
-  GIT_TAG        14206fd48832ab600d9db75f15acb5062ae2c296 # fix clip tokenizer
+  GIT_REPOSITORY https://github.com/leejet/stable-diffusion.cpp.git
+  GIT_TAG        ac54e0076052a196b7df961eb1f792c9ff4d7f22 # sd 3.5 support
 )
 
 FetchContent_Declare(
