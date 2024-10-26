@@ -30,6 +30,19 @@ FetchContent_Declare(
   GIT_TAG        f9ff166845a59327eda431af82ee85a9c7532c5d
 )
 
+if(NOT WIN32)
+  if(EXISTS ${CMAKE_SYSROOT}/usr/lib/x86_64-linux-gnu/libvulkan.so)
+    set(Vulkan_INCLUDE_DIR ${CMAKE_SYSROOT}/usr/include)
+    set(Vulkan_LIBRARY ${CMAKE_SYSROOT}/usr/lib/x86_64-linux-gnu/libvulkan.so)
+  endif()
+endif()
+find_package(Vulkan)
+
+if(Vulkan_FOUND)
+    set(SD_FLASH_ATTN ON)
+    set(SD_VULKAN ON)
+endif()
+
 set(IMPLIB_SOURCE_FILES "")
 if (CUDAToolkit_FOUND)
   set(SD_CUBLAS ON)
@@ -98,5 +111,3 @@ if(MSVC AND CMAKE_JS_NODELIB_DEF AND CMAKE_JS_NODELIB_TARGET)
   execute_process(COMMAND ${CMAKE_AR} /def:${CMAKE_JS_NODELIB_DEF} /out:${CMAKE_JS_NODELIB_TARGET} ${CMAKE_STATIC_LINKER_FLAGS})
   target_link_options(node-stable-diffusion-cpp PRIVATE "/DELAYLOAD:nvcuda.dll")
 endif()
-
-
