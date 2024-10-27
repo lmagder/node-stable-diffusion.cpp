@@ -8,6 +8,8 @@ declare module "@lmagder/node-stable-diffusion-cpp" {
     DPMPP2M,
     DPMPP2Mv2,
     LCM,
+    IPNDM,
+    IPNDM_V
   }
 
   declare enum Schedule {
@@ -15,6 +17,7 @@ declare module "@lmagder/node-stable-diffusion-cpp" {
     Discrete,
     Karras,
     AYS,
+    GITS,
   }
 
   declare enum Type {
@@ -66,6 +69,7 @@ declare module "@lmagder/node-stable-diffusion-cpp" {
       negativePrompt?: string;
       clipSkip?: number;
       cfgScale?: number;
+      guidance?: number;
       width?: number;
       height?: number;
       sampleMethod?: SampleMethod;
@@ -84,6 +88,7 @@ declare module "@lmagder/node-stable-diffusion-cpp" {
       negativePrompt?: string;
       clipSkip?: number;
       cfgScale?: number;
+      guidance?: number;
       width?: number;
       height?: number;
       sampleMethod?: SampleMethod;
@@ -116,7 +121,11 @@ declare module "@lmagder/node-stable-diffusion-cpp" {
 
   export const createContext: (
     params: {
-      model: string;
+      model?: string;
+      clipL?: string;
+      clipG?: string;
+      t5xxl?: string;
+      diffusionModel?: string;
       vae?: string;
       taesd?: string;
       controlNet?: string;

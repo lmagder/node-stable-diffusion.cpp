@@ -20,8 +20,8 @@ endif()
 
 FetchContent_Declare(
   stable-diffusion-cpp
-  GIT_REPOSITORY https://github.com/lmagder/stable-diffusion.cpp.git
-  GIT_TAG        f974370e049da45866d70f45673c5453e089251b # fix-untyped-tensors
+  GIT_REPOSITORY https://github.com/leejet/stable-diffusion.cpp.git
+  GIT_TAG        ac54e0076052a196b7df961eb1f792c9ff4d7f22 # sd 3.5 support
 )
 
 FetchContent_Declare(
@@ -30,8 +30,22 @@ FetchContent_Declare(
   GIT_TAG        f9ff166845a59327eda431af82ee85a9c7532c5d
 )
 
+find_package(Vulkan QUIET)
+if(NOT WIN32 AND NOT Vulkan_FOUND)
+  if(EXISTS ${CMAKE_SYSROOT}/usr/lib/x86_64-linux-gnu/libvulkan.so)
+    set(Vulkan_INCLUDE_DIR ${CMAKE_SYSROOT}/usr/include)
+    set(Vulkan_LIBRARY ${CMAKE_SYSROOT}/usr/lib/x86_64-linux-gnu/libvulkan.so)
+    find_package(Vulkan)
+  endif()
+endif()
+
+if(Vulkan_FOUND)
+    set(SD_FLASH_ATTN ON)
+    set(SD_VULKAN ON)
+endif()
+
 set(IMPLIB_SOURCE_FILES "")
-if (CUDAToolkit_FOUND)
+if (CUDAToolkit_FOUND AND NOT Vulkan_FOUND)
   set(SD_CUBLAS ON)
   set(SD_FLASH_ATTN ON)
   set(GGML_CUDA_F16 ON)
@@ -87,7 +101,7 @@ target_compile_definitions(node-stable-diffusion-cpp PRIVATE NAPI_VERSION=9 NODE
 
 target_link_libraries(node-stable-diffusion-cpp ${CMAKE_JS_LIB} stable-diffusion)
 
-if (CUDAToolkit_FOUND)
+if (CUDAToolkit_FOUND AND NOT Vulkan_FOUND)
   file(GENERATE OUTPUT $<TARGET_FILE_DIR:node-stable-diffusion-cpp>/cuda_version.json INPUT ${CUDAToolkit_LIBRARY_ROOT}/version.json)
 else()
   file(GENERATE OUTPUT $<TARGET_FILE_DIR:node-stable-diffusion-cpp>/cuda_version.json CONTENT "{}")
@@ -98,5 +112,3 @@ if(MSVC AND CMAKE_JS_NODELIB_DEF AND CMAKE_JS_NODELIB_TARGET)
   execute_process(COMMAND ${CMAKE_AR} /def:${CMAKE_JS_NODELIB_DEF} /out:${CMAKE_JS_NODELIB_TARGET} ${CMAKE_STATIC_LINKER_FLAGS})
   target_link_options(node-stable-diffusion-cpp PRIVATE "/DELAYLOAD:nvcuda.dll")
 endif()
-
-

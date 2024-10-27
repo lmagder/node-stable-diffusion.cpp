@@ -59,8 +59,10 @@ if (fs.existsSync(versionListPath) && process.env.npm_command !== "ci") {
   const versionList = JSON.parse(fs.readFileSync(versionListPath, { encoding: "utf8" }));
   const versionListHash = hasher({ sort: true }).hash(versionList) + "_" + cudaSubfolder;
   const downloadMarkerPath = path.join(resolvedPath, downloadMarkerFile);
+  const componentCount = Object.keys(versionList).length;
+  const needsDownload = !fs.existsSync(downloadMarkerPath) || fs.readFileSync(downloadMarkerPath).toString() !== versionListHash;
 
-  if (!fs.existsSync(downloadMarkerPath) || fs.readFileSync(downloadMarkerPath).toString() !== versionListHash) {
+  if (componentCount > 0 && needsDownload) {
     console.info(`Downloading components ${components} for ${arch} - ${platform}`);
 
     for (const componentId of components) {
