@@ -268,6 +268,8 @@ namespace
                 Napi::PropertyDescriptor::Value("DPMPP2M", Napi::Number::New(env, DPMPP2M)),
                 Napi::PropertyDescriptor::Value("DPMPP2Mv2", Napi::Number::New(env, DPMPP2Mv2)),
                 Napi::PropertyDescriptor::Value("LCM", Napi::Number::New(env, LCM)),
+                Napi::PropertyDescriptor::Value("IPNDM", Napi::Number::New(env, IPNDM)),
+                Napi::PropertyDescriptor::Value("IPNDM_V", Napi::Number::New(env, IPNDM_V)),
              });
             sampleMethodEnum.Freeze();
 
@@ -277,8 +279,8 @@ namespace
                 Napi::PropertyDescriptor::Value("Default", Napi::Number::New(env, DEFAULT)),
                 Napi::PropertyDescriptor::Value("Discrete", Napi::Number::New(env, DISCRETE)),
                 Napi::PropertyDescriptor::Value("Karras", Napi::Number::New(env, KARRAS)),
-                Napi::PropertyDescriptor::Value("GITS", Napi::Number::New(env, GITS)),
                 Napi::PropertyDescriptor::Value("AYS", Napi::Number::New(env, AYS)),
+                Napi::PropertyDescriptor::Value("GITS", Napi::Number::New(env, GITS)),
             });
             scheduleEnum.Freeze();
 
