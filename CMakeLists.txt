@@ -30,13 +30,14 @@ FetchContent_Declare(
   GIT_TAG        f9ff166845a59327eda431af82ee85a9c7532c5d
 )
 
-if(NOT WIN32)
+find_package(Vulkan QUIET)
+if(NOT WIN32 AND NOT Vulkan_FOUND)
   if(EXISTS ${CMAKE_SYSROOT}/usr/lib/x86_64-linux-gnu/libvulkan.so)
     set(Vulkan_INCLUDE_DIR ${CMAKE_SYSROOT}/usr/include)
     set(Vulkan_LIBRARY ${CMAKE_SYSROOT}/usr/lib/x86_64-linux-gnu/libvulkan.so)
+    find_package(Vulkan)
   endif()
 endif()
-find_package(Vulkan)
 
 if(Vulkan_FOUND)
     set(SD_FLASH_ATTN ON)
@@ -44,7 +45,7 @@ if(Vulkan_FOUND)
 endif()
 
 set(IMPLIB_SOURCE_FILES "")
-if (CUDAToolkit_FOUND)
+if (CUDAToolkit_FOUND AND NOT Vulkan_FOUND)
   set(SD_CUBLAS ON)
   set(SD_FLASH_ATTN ON)
   set(GGML_CUDA_F16 ON)
@@ -100,7 +101,7 @@ target_compile_definitions(node-stable-diffusion-cpp PRIVATE NAPI_VERSION=9 NODE
 
 target_link_libraries(node-stable-diffusion-cpp ${CMAKE_JS_LIB} stable-diffusion)
 
-if (CUDAToolkit_FOUND)
+if (CUDAToolkit_FOUND AND NOT Vulkan_FOUND)
   file(GENERATE OUTPUT $<TARGET_FILE_DIR:node-stable-diffusion-cpp>/cuda_version.json INPUT ${CUDAToolkit_LIBRARY_ROOT}/version.json)
 else()
   file(GENERATE OUTPUT $<TARGET_FILE_DIR:node-stable-diffusion-cpp>/cuda_version.json CONTENT "{}")
