@@ -49,18 +49,18 @@
     "decompress": "4.2.1",
     "decompress-tar": "4.1.1",
     "decompress-unzip": "4.0.1",
-    "file-type": "19.4.1",
-    "node-addon-api": "8.1.0",
+    "file-type": "19.6.0",
+    "node-addon-api": "8.2.1",
     "node-object-hash": "3.0.0",
     "path-exists-cli": "2.0.0",
     "pkg-prebuilds": "1.0.0",
-    "sharp": "0.33.4",
+    "sharp": "0.33.5",
     "xz-decompress": "0.2.2"
   },
   "devDependencies": {
     "@types/decompress": "4.2.7",
-    "@types/node": "22.3.0",
+    "@types/node": "22.9.0",
     "prettier": "3.3.3",
-    "typescript": "5.5.4"
+    "typescript": "5.6.3"
   }
 }

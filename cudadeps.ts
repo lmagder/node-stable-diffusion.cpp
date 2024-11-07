@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 import loadBinding from "pkg-prebuilds";
 import { fileTypeFromBuffer, fileTypeFromStream } from "file-type";
 import xz from "xz-decompress";
-import { Stream } from "node:stream";
+import { Stream, Readable } from "node:stream";
 import { buffer } from "node:stream/consumers";
 import decompress from "decompress";
 import { ReadableStream } from "node:stream/web";
@@ -33,7 +33,7 @@ const nodeToCudaPlatform = {
   win32: "windows",
 } as Record<string, string>;
 
-const decompressTarXz = () => async (input: Buffer | NodeJS.ReadableStream) => {
+const decompressTarXz = () => async (input: Buffer | Readable) => {
   const type = Buffer.isBuffer(input) ? await fileTypeFromBuffer(input) : await fileTypeFromStream(input);
   if (!type || type.ext !== "xz") {
     return [];
