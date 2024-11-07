@@ -1,6 +1,6 @@
 {
   "name": "@lmagder/node-stable-diffusion-cpp",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "author": "Lucas Magder (https://github.com/lmagder)",
   "description": "Node bindings for https://github.com/leejet/stable-diffusion.cpp",
   "license": "MIT",
